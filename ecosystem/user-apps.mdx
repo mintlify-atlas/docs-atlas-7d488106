@@ -1,5 +1,5 @@
 ---
-title: "The Hypr* Ecosystem: User Apps and Utilities"
+title: "Hypr* Ecosystem: First-Party User Apps and Utilities"
 sidebarTitle: "User Apps"
 description: "A complete guide to every user-facing Hypr* application — from screen locking and wallpapers to launchers, portals, and Qt theming tools."
 ---
@@ -89,7 +89,7 @@ The Hypr\* ecosystem is a suite of first-party tools built and maintained by the
     - Vector-based themes stored in `~/.local/share/icons` or `~/.icons`
     - Set theme and size via `HYPRCURSOR_THEME` and `HYPRCURSOR_SIZE` environment variables, or with `hyprctl setcursor`
     - Apps without server-side cursor support (e.g., GTK) fall back to XCursor; set `XCURSOR_THEME`/`XCURSOR_SIZE` for those
-    - Flatpak apps need filesystem overrides: `flatpak override --filesystem=~/.icons:ro --user`
+    - Flatpak apps need filesystem overrides: `flatpak override --filesystem=~/.themes:ro --filesystem=~/.icons:ro --user`
     - Theme creation and porting tools available in the `hyprcursor-util/` directory of the repo
 
     ```lua
@@ -131,9 +131,8 @@ The Hypr\* ecosystem is a suite of first-party tools built and maintained by the
     - Config at `~/.config/hyprpolkitagent/hyprpolkitagent.conf` (optional)
 
     **Autostart:**
-    ```ini
-    # In your Hyprland config exec-once:
-    exec-once = systemctl --user start hyprpolkitagent
+    ```sh
+    systemctl --user start hyprpolkitagent
     ```
 
     <Tip>
@@ -148,7 +147,7 @@ The Hypr\* ecosystem is a suite of first-party tools built and maintained by the
 
     **Key features:**
     - Time-based `profile {}` blocks activated automatically at the specified `time`
-    - Per-profile `temperature` (color warmth), `gamma` (perceived brightness), and `identity` (gamma-only mode)
+    - Per-profile `temperature` (screen color temperature; lower is warmer), `gamma` (perceived brightness), and `identity` (disables temperature adjustment, applying only gamma)
     - `on-switch` command executed when a profile activates (e.g., toggle GTK dark/light theme)
     - Full IPC via `hyprctl hyprsunset temperature`, `gamma`, `identity`, `reset`, and `profile`
     - `max-gamma` cap to prevent accidental over-brightening

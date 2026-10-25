@@ -1,5 +1,5 @@
 ---
-title: "Hyprland Configuration Options Reference Guide"
+title: "Full Hyprland Configuration Options Reference Guide"
 sidebarTitle: "Config Options"
 description: "Complete reference for Hyprland config options: general, decoration, blur, shadow, input, gestures, group, misc, binds, cursor, render, and debug sections."
 ---
@@ -7,7 +7,7 @@ description: "Complete reference for Hyprland config options: general, decoratio
 Hyprland's configuration is driven by a Lua-based config file. Every option lives under a named category and is set using `hl.config()`. This page documents every option available across all core sections — excluding layout-specific options, which are described on their respective layout pages.
 
 <Note>
-Before continuing, familiarise yourself with the [naming conventions used in this wiki](/configuring/selectors). In particular, be aware of data types like `css_gaps`, `gradient`, `color`, and `vec2`.
+Before continuing, familiarise yourself with [selectors and data types](/configuring/selectors). In particular, be aware of types like `css_gaps`, `gradient`, `color`, and `vec2` used throughout the option tables below.
 </Note>
 
 ## Syntax
@@ -270,7 +270,7 @@ See the [Animations page](/configuring/animations) for full animation tree and c
 | `swallow_focus_click` | First click focuses unfocused window without forwarding the click | bool | `false` | |
 
 <Tip>
-XKB layouts, models, variants, and options can be found in `/usr/share/X11/xkb/rules/evdev.lst`, or via `localectl`. For switchable layouts, see the [Keyboard Layouts section](/configuring/binds#switchable-keyboard-layouts).
+XKB layouts, models, variants, and options can be found in `/usr/share/X11/xkb/rules/evdev.lst`, or via `localectl`. For switchable layouts, see the [Keyboard Layouts section](/configuring/binds#keyboard-layouts).
 </Tip>
 
 <Accordion title="follow_mouse values">
@@ -334,6 +334,17 @@ XKB layouts, models, variants, and options can be found in `/usr/share/X11/xkb/r
 | --- | --- | --- | --- | --- |
 | `release_pressed_on_close` | Release all pressed keys when virtual keyboard closes | bool | `false` | |
 | `share_states` | Unify key and modifier states with other keyboards: `0`=no, `1`=yes, `2`=yes unless IME | int | `2` | [0 – 2] |
+
+### Tablettool
+
+**Category:** `input.tablettool`
+
+| Name | Description | Type | Default | Limits |
+| --- | --- | --- | --- | --- |
+| `eraser_button_mode` | Change eraser button behavior: `0`=hardware default, `1`=send a button event instead | int | `0` | [0 – 6] |
+| `eraser_button_override` | Button to use when `eraser_button_mode = 1`. Must be a valid button (e.g. `BTN_STYLUS`). `0` = default | int | `0` | [0 – ...] |
+| `pressure_range_min` | Minimum pressure range. Negative = device defaults (usually `0.0`) | float | `-1.0` | [-1.0 – 1.0] |
+| `pressure_range_max` | Maximum pressure range. Negative = device defaults (usually `1.0`) | float | `-1.0` | [-1.0 – 1.0] |
 
 ---
 
@@ -404,15 +415,41 @@ XKB layouts, models, variants, and options can be found in `/usr/share/X11/xkb/r
 | `font_size` | Font size of groupbar title | int | `8` | [2 – 64] |
 | `font_weight_active` | Font weight of active title | font_weight | `"normal"` | |
 | `font_weight_inactive` | Font weight of inactive title | font_weight | `"normal"` | |
+| `gaps_in` | Gap size between gradients | int | `2` | [0 – 20] |
+| `gaps_out` | Gap size between gradients and window | int | `2` | [0 – 20] |
 | `gradients` | Enable gradient backgrounds | bool | `false` | |
+| `gradient_round_only_edges` | Round only the outer edges of the entire groupbar | bool | `true` | |
+| `gradient_rounding` | How much to round gradient edges | int | `2` | [0 – 100] |
+| `gradient_rounding_power` | Curve for gradient edge rounding (1.0 = triangular, 2.0 = circle, 4.0 = squircle) | float | `2.0` | [1.0 – 10.0] |
 | `height` | Height of the groupbar | int | `14` | [0 – 64] |
+| `indicator_gap` | Height of gap between groupbar indicator and title | int | `0` | [0 – 64] |
 | `indicator_height` | Height of the groupbar indicator | int | `3` | [0 – 64] |
+| `keep_upper_gap` | Add or remove the upper gap above the groupbar | bool | `true` | |
 | `middle_click_close` | Close clicked window with middle click | bool | `true` | |
+| `priority` | Decoration priority for groupbars | int | `3` | [0 – 6] |
 | `render_titles` | Render titles in the groupbar | bool | `true` | |
+| `round_only_edges` | Round only the indicator edges of the entire groupbar | bool | `true` | |
 | `rounding` | Indicator rounding amount | int | `1` | [0 – 40] |
+| `rounding_power` | Curve for groupbar corner rounding (1.0 = triangular, 2.0 = circle, 4.0 = squircle) | float | `2.0` | [1.0 – 10.0] |
 | `scrolling` | Scroll in groupbar changes active window | bool | `true` | |
 | `stacked` | Render groupbar as a vertical stack | bool | `false` | |
 | `text_color` | Window title color | color | `0xffffffff` | |
+| `text_color_inactive` | Inactive window title color (falls back to `text_color`) | color | `[[Empty]]` | |
+| `text_color_locked_active` | Active window title color in a locked group (falls back to `text_color`) | color | `[[Empty]]` | |
+| `text_color_locked_inactive` | Inactive window title color in locked groups (falls back to `text_color_inactive`) | color | `[[Empty]]` | |
+| `text_offset` | Adjust vertical position for titles | int | `0` | [-20 – 20] |
+| `text_padding` | Set horizontal padding for titles | int | `0` | [0 – 22] |
+
+### Groupbar Colors
+
+**Category:** `group.groupbar.col`
+
+| Name | Description | Type | Default |
+| --- | --- | --- | --- |
+| `active` | Active group bar background color | gradient | `0x66ffff00` |
+| `inactive` | Inactive group bar background color | gradient | `0x66777700` |
+| `locked_active` | Active locked group bar background color | gradient | `0x66ff5500` |
+| `locked_inactive` | Inactive locked group bar background color | gradient | `0x66775500` |
 
 ---
 
@@ -423,26 +460,54 @@ XKB layouts, models, variants, and options can be found in `/usr/share/X11/xkb/r
 | Name | Description | Type | Default | Limits |
 | --- | --- | --- | --- | --- |
 | `allow_session_lock_restore` | Allow restarting a crashed lock screen app | bool | `false` | |
+| `always_follow_on_dnd` | Make mouse focus follow the mouse when dragging and dropping | bool | `true` | |
 | `animate_manual_resizes` | Animate manual window resizes | bool | `false` | |
 | `animate_mouse_windowdragging` | Animate windows dragged by mouse | bool | `false` | |
+| `anr_missed_pings` | Number of missed pings before showing the ANR dialog | int | `5` | [1 – 20] |
 | `background_color` | Background color (requires `disable_hyprland_logo`) | color | `0x111111` | |
+| `bell_sound` | Path to custom wav/ogg system bell. `"none"` or empty mutes it. `"default"` uses system bell | string | `"default"` | |
 | `close_special_on_empty` | Close special workspace when last window is removed | bool | `true` | |
 | `disable_autoreload` | Do not auto-reload config on save | bool | `false` | |
+| `disable_hyprland_guiutils_check` | Disable warning if hyprland-guiutils is not installed | bool | `false` | |
 | `disable_hyprland_logo` | Disable the random Hyprland background | bool | `false` | |
+| `disable_scale_notification` | Disable popup when a monitor fails to set a suitable scale | bool | `false` | |
 | `disable_splash_rendering` | Disable splash text rendering | bool | `false` | |
+| `disable_watchdog_warning` | Disable warning about not using start-hyprland | bool | `false` | |
+| `disable_xdg_env_checks` | Disable warning if XDG environment is externally managed | bool | `false` | |
 | `enable_anr_dialog` | Show ANR dialog for hung applications | bool | `true` | |
 | `enable_swallow` | Enable window swallowing | bool | `false` | |
+| `exit_window_retains_fullscreen` | When closing a fullscreen window, fullscreen the next focused window: `0`=off, `1`=on, `2`=grouped only, `3`=non-grouped only | int | `0` | [0 – 3] |
+| `float_force_onscreen` | Constrain existing floating windows on-screen: `0`=off, `1`=partially, `2`=fully | int | `0` | [0 – 2] |
+| `new_float_force_onscreen` | Same as `float_force_onscreen` for newly spawned windows | int | `2` | [0 – 2] |
 | `focus_on_activate` | Focus apps that request activation | bool | `false` | |
 | `font_family` | Global default font | string | `"Sans"` | |
+| `force_default_wallpaper` | Enforce a default wallpaper: `-1`=random, `0`/`1`=no anime, `2`=anime | int | `-1` | [-1 – 2] |
+| `initial_workspace_token_timeout` | Seconds a window has to open on its invoked workspace before tracking expires | int | `10` | [1 – 3600] |
+| `initial_workspace_tracking` | Open windows on the workspace they were invoked on: `0`=off, `1`=single-shot, `2`=persistent | int | `1` | |
 | `key_press_enables_dpms` | Wake monitors on key press if DPMS is off | bool | `false` | |
 | `layers_hog_keyboard_focus` | Keyboard-interactive layers keep focus on mouse move | bool | `true` | |
+| `lockdead_screen_delay` | Delay in ms before "lockdead" screen appears if lock screen fails to cover all outputs | int | `1000` | [0 – 5000] |
 | `middle_click_paste` | Enable middle-click paste (primary selection) | bool | `true` | |
 | `mouse_move_enables_dpms` | Wake monitors on mouse move if DPMS is off | bool | `false` | |
 | `mouse_move_focuses_monitor` | Focus monitor when mouse moves into it | bool | `true` | |
+| `on_focus_under_fullscreen` | How tiled windows requesting focus behave under a fullscreen window: `0`=ignore, `1`=take over, `2`=unfullscreen | int | `2` | [0 – 2] |
 | `render_unfocused_fps` | Max FPS for unfocused background windows | int | `15` | [1 – 120] |
+| `screencopy_force_8b` | Force 8-bit screencopy | bool | `true` | |
+| `session_lock_blur` | Enable blur for lock screen (requires `session_lock_xray`) | bool | `false` | |
+| `session_lock_xray` | Keep rendering workspaces below the lock screen | bool | `false` | |
+| `size_limits_tiled` | Apply `min_size`/`max_size` rules to tiled windows | bool | `false` | |
+| `splash_font_family` | Font used for splash text (requires monitor reload) | string | `[[Empty]]` | |
 | `swallow_regex` | Class regex for windows that swallow terminals | string | `[[Empty]]` | |
 | `swallow_exception_regex` | Title regex for windows that should NOT be swallowed | string | `[[Empty]]` | |
 | `vrr` | VRR (Adaptive Sync): `0`=off, `1`=on, `2`=fullscreen only, `3`=fullscreen with game/video | int | `0` | [0 – 3] |
+
+### Misc Colors
+
+**Category:** `misc.col`
+
+| Name | Description | Type | Default |
+| --- | --- | --- | --- |
+| `splash` | Color of the splash text (requires monitor reload) | color | `0x55ffffff` |
 
 ---
 
@@ -503,6 +568,16 @@ XKB layouts, models, variants, and options can be found in `/usr/share/X11/xkb/r
 
 ---
 
+## OpenGL
+
+**Category:** `opengl`
+
+| Name | Description | Type | Default |
+| --- | --- | --- | --- |
+| `nvidia_anti_flicker` | Reduces flickering on NVIDIA at the cost of possible frame drops on lower-end GPUs. Ignored on non-NVIDIA | bool | `true` |
+
+---
+
 ## Render
 
 **Category:** `render`
@@ -512,10 +587,32 @@ XKB layouts, models, variants, and options can be found in `/usr/share/X11/xkb/r
 | `async_commit` | Send DRM commits asynchronously to reduce cursor latency | bool | `false` | |
 | `cm_auto_hdr` | Auto-switch to HDR in fullscreen: `0`=off, `1`=hdr, `2`=hdredid | int | `1` | [0 – 2] |
 | `cm_enabled` | Enable color management pipeline (requires restart) | bool | `true` | |
-| `direct_scanout` | Enable direct scanout for fullscreen apps: `0`=off, `1`=on, `2`=auto | int | `0` | [0 – 2] |
+| `cm_sdr_eotf` | Default transfer function for SDR apps: `"default"`, `"gamma22"`, `"gamma22force"`, `"srgb"` | string | `"default"` | |
+| `commit_timing_enabled` | Enable commit timing proto (requires restart) | bool | `true` | |
+| `ctm_animation` | Fade animation for CTM changes (e.g. hyprsunset): `0`=off, `1`=on, `2`=auto (disabled on NVIDIA) | int | `2` | [0 – 2] |
+| `direct_scanout` | Enable direct scanout for fullscreen apps: `0`=off, `1`=on, `2`=auto (game content type) | int | `0` | [0 – 2] |
 | `expand_undersized_textures` | Expand undersized textures along edge rather than stretching | bool | `true` | |
+| `fp16_sdr_tf` | Internal workbuffer transfer function for fp16 in SDR mode: `0`=monitor, `1`=linear | int | `0` | [0 – 1] |
+| `icc_vcgt_enabled` | Send VCGT ramps to KMS with ICC profiles | bool | `true` | |
+| `keep_unmodified_copy` | Keep unmodified SDR frame for screensharing: `0`=off, `1`=on, `2`=auto (HDR with SDR modifiers) | int | `2` | [0 – 2] |
 | `new_render_scheduling` | Use triple buffering when needed | bool | `false` | |
+| `non_shader_cm` | Enable CM without shader: `0`=off, `1`=when possible, `2`=DS/passthrough only, `3`=disable | int | `2` | [0 – 3] |
+| `non_shader_cm_interop` | External CTM behavior in fullscreen: `0`=disabled, `1`=enabled, `2`=disabled for photo/video/game | int | `2` | [0 – 2] |
+| `send_content_type` | Report content type to allow monitor profile autoswitch | bool | `true` | |
+| `use_fp16` | Use FP16 buffers internally: `0`=off, `1`=on, `2`=HDR mode only | int | `2` | [0 – 2] |
+| `use_shader_blur_blend` | Use experimental blurred bg blending (may glitch on rotated screens) | bool | `false` | |
 | `xp_mode` | Disable back buffer and bottom layer rendering | bool | `false` | |
+
+---
+
+## Layout
+
+**Category:** `layout`
+
+| Name | Description | Type | Default | Limits |
+| --- | --- | --- | --- | --- |
+| `single_window_aspect_ratio` | When only one window is shown, add padding to conform to this aspect ratio (e.g. `{4, 3}`). `{0, 0}` = disabled | vec2 | `{0, 0}` | |
+| `single_window_aspect_ratio_tolerance` | Skip padding if it would be smaller than this fraction of screen height or width | float | `0.1` | [0.0 – 1.0] |
 
 ---
 
@@ -528,6 +625,32 @@ XKB layouts, models, variants, and options can be found in `/usr/share/X11/xkb/r
 | `enforce_permissions` | Enable permission control | bool | `false` |
 | `no_donation_nag` | Disable the twice-yearly donation popup | bool | `false` |
 | `no_update_news` | Disable update news popup | bool | `false` |
+
+---
+
+## Quirks
+
+**Category:** `quirks`
+
+| Name | Description | Type | Default | Limits |
+| --- | --- | --- | --- | --- |
+| `prefer_hdr` | Report HDR mode as preferred: `0`=off, `1`=always, `2`=gamescope only | int | `0` | [0 – 2] |
+| `skip_non_kms_dmabuf_formats` | Do not report dmabuf formats that cannot be imported into KMS | bool | `false` | |
+
+<Note>
+Some clients expect the monitor to be in HDR mode before they start. This breaks auto HDR activation and can cause whitescreen and flickering. Use `prefer_hdr` to fix it.
+</Note>
+
+---
+
+## Input Capture
+
+**Category:** `input-capture`
+
+| Name | Description | Type | Default |
+| --- | --- | --- | --- |
+| `capture_modifiers` | If enabled, modifier keys are also captured and sent to the capturing program | bool | `false` |
+| `enforce_barriers` | If enabled, throw a Wayland error when an invalid barrier is received | bool | `true` |
 
 ---
 
@@ -545,10 +668,14 @@ These settings are intended only for development and testing. Do not change them
 | `damage_blink` | Flash areas updated with damage tracking (epilepsy warning!) | bool | `false` |
 | `damage_tracking` | Redraw only needed display areas: `0`=none, `1`=monitor, `2`=full | int | `2` |
 | `disable_logs` | Disable file logging | bool | `true` |
+| `disable_scale_checks` | Disable scale factor verification (may cause pixel alignment errors) | bool | `false` |
+| `disable_time` | Disable time logging | bool | `true` |
 | `enable_stdout_logs` | Enable logging to stdout | bool | `false` |
 | `error_limit` | Limit number of displayed config errors | int | `5` |
 | `error_position` | Error bar position: `0`=top, `1`=bottom | int | `0` |
-| `gl_debugging` | Enable OpenGL debug (requires restart) | bool | `false` |
+| `gl_debugging` | Enable OpenGL debug with glGetError and EGL_KHR_debug (requires restart) | bool | `false` |
+| `log_damage` | Enable logging of damage events | bool | `false` |
+| `manual_crash` | Set to `1` then back to `0` to crash Hyprland | int | `0` | [0 – 1] |
 | `overlay` | Print performance overlay (disable VFR for accuracy) | bool | `false` |
 | `suppress_errors` | Suppress config file parsing error display | bool | `false` |
 | `vfr` | Variable frame rate — leave enabled to conserve resources | bool | `true` |

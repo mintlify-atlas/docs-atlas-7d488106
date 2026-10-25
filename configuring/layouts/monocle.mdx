@@ -32,7 +32,7 @@ To cycle Monocle windows correctly, use one of these two approaches:
   <Tab title="Window Dispatcher with tiled flag">
     ```lua
     hl.bind("SUPER + Tab",       hl.dsp.window.cycle_next({ tiled = true }))
-    hl.bind("SUPER + SHIFT + Tab", hl.dsp.window.cycle_next({ tiled = true, prev = true }))
+    hl.bind("SUPER + SHIFT + Tab", hl.dsp.window.cycle_next({ tiled = true, next = false }))
     ```
   </Tab>
 </Tabs>

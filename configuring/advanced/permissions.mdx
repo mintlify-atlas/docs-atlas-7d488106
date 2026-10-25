@@ -11,7 +11,7 @@ Hyprland includes a fine-grained permission system that governs which applicatio
 </Note>
 
 <Tip>
-  If you care about locking down compositor access, you likely also want to restrict access to Hyprland's IPC sockets. Hyprland itself cannot enforce socket-level access control; consult the documentation for your application sandbox (e.g., Flatpak, bubblewrap, Firejail).
+  If you care about locking down compositor access, you likely also want to restrict access to Hyprland's [IPC sockets](/ipc). Hyprland itself cannot enforce socket-level access control; consult the documentation for your application sandbox (e.g., Flatpak, bubblewrap, Firejail).
 </Tip>
 
 ---
@@ -83,9 +83,6 @@ Rules are evaluated in order. The first matching rule for a given `(binary, type
   **Why deny `hyprctl`?** An attacker with shell access could run `hyprctl plugin load /tmp/malicious.so`. Setting `deny` or `ask` for `hyprctl` prevents silent plugin injection.
 
   ```lua
-  -- Allow hyprpm to load plugins without prompting
-  hl.permission({ binary = "/usr/bin/hyprpm", type = "plugin", mode = "allow" })
-
   -- Always prompt when hyprctl tries to load a plugin
   hl.permission({ binary = "/usr/bin/hyprctl", type = "plugin", mode = "ask" })
   ```
@@ -133,11 +130,11 @@ Rules are evaluated in order. The first matching rule for a given `(binary, type
     })
     ```
   </Step>
-  <Step title="Allow hyprpm to load plugins">
-    Let the official plugin manager load plugins silently.
+  <Step title="Restrict hyprctl from loading plugins">
+    Require a prompt whenever hyprctl tries to load a plugin, to prevent silent plugin injection via a compromised shell.
 
     ```lua
-    hl.permission({ binary = "/usr/bin/hyprpm", type = "plugin", mode = "allow" })
+    hl.permission({ binary = "/usr/bin/hyprctl", type = "plugin", mode = "ask" })
     ```
   </Step>
   <Step title="NixOS: use regex for Nix store paths">

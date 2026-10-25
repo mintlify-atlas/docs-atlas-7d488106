@@ -16,10 +16,10 @@ general {
 }
 ```
 
-You can also switch layouts at runtime using `hl.config.set`:
+You can also switch layouts at runtime using `hl.config`:
 
 ```lua
-hl.config.set("general.layout", "master")
+hl.config({ ["general.layout"] = "master" })
 ```
 
 <Note>

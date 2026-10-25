@@ -1,5 +1,5 @@
 ---
-title: "Configuring Animations and Curves in Hyprland"
+title: "Hyprland Animations: Tree, Bezier, and Spring Curves"
 sidebarTitle: "Animations"
 description: "Guide to Hyprland animations: the animation tree, bezier and spring curves, styles, speed settings, and per-leaf overrides for windows and workspaces."
 ---
@@ -36,7 +36,7 @@ hl.animation({ leaf = "fade",       enabled = false })
 
 Animations form an inheritance tree. An unset leaf inherits its parent's values.
 
-```
+```text
 global
   ↳ windows — styles: slide, popin, gnomed
     ↳ windowsIn  — window open

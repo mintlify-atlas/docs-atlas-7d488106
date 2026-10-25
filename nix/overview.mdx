@@ -15,12 +15,6 @@ Hyprland has first-class support for the Nix ecosystem. Whether you are running 
   <Card title="Home Manager" icon="house" href="/nix/home-manager">
     Declaratively configure Hyprland, manage plugins, and integrate with Home Manager's `wayland.windowManager.hyprland` module.
   </Card>
-  <Card title="Hyprland on Any Distro" href="/nix/nixos">
-    Install the Nix package manager on any Linux distribution and run a guaranteed up-to-date Hyprland without compiling from source.
-  </Card>
-  <Card title="Binary Cache (Cachix)" href="/nix/nixos">
-    Use the Hyprland Cachix cache so you never have to compile Hyprland or its heavy dependencies like `mesa` yourself.
-  </Card>
 </CardGroup>
 
 ## Why Use Nix for Hyprland?
@@ -46,16 +40,12 @@ Nix solves this by pinning every dependency in the package graph to exact, repro
   <Tab title="Nix on Another Distro">
     If you are on Ubuntu, Fedora, Arch, or any other distribution, you can install the Nix package manager and then run Hyprland from the Nix store. This gives you an always-up-to-date Hyprland without needing to compile anything or depend on your distro's packaging.
 
-    Install Hyprland via the flake:
+    Install Hyprland via hyprnix (recommended):
 
     ```sh
-    sudo nix profile add --profile /nix/var/nix/profiles/default github:hyprwm/Hyprland
+    sudo nix profile add --profile /nix/var/nix/profiles/default github:hyprwm/hyprnix#hyprland
     ```
 
-    See the [Any Distro page](/nix/nixos) for details on `nixGL` and login manager integration.
+    See the [NixOS page](/nix/nixos) for details on `nixGL` and login manager integration.
   </Tab>
 </Tabs>
-
-## Advanced Configuration and Debugging
-
-The [Advanced](/nix/nixos) page covers package overlays, build overrides, building Hyprland plugins with `mkHyprlandPlugin`, and using Nix repl for quick experiments. The [Contributing and Debugging](/nix/nixos) page explains how to use the provided `devShell`, build in debug mode, and bisect regressions using Cachix-stored binaries.

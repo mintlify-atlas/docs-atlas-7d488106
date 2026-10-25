@@ -50,10 +50,10 @@ Pseudotiling allows a window to retain its floating preferred size while still p
 Toggle pseudotiling for the focused window using the `window.pseudo` dispatcher:
 
 ```lua
-hl.bind("SUPER + P", hl.dsp.window.pseudo())
+hl.bind("SUPER + P", hl.dsp.window.pseudo({}))
 ```
 
-The dispatcher accepts an optional window selector. Leave it empty or use `"active"` to target the focused window, or pass `"window"` followed by a selector to target a specific window.
+The dispatcher accepts an optional window selector. Leave it empty or use `"active"` to target the focused window, or pass a window selector to target a specific window.
 
 ## Dispatchers
 
@@ -96,8 +96,11 @@ By default the behavior is **stable** — the focused window stays on the same s
 -- Move the active window to the root of the tree
 hl.bind("SUPER + A", hl.dsp.layout("movetoroot active"))
 
--- Move a specific window class to root, with unstable swap
-hl.bind("SUPER + A", hl.dsp.layout("movetoroot class:imcool unstable"))
+-- Move a specific window class to root
+hl.bind("SUPER + A", hl.dsp.layout("movetoroot class:imcool"))
+
+-- Move the active window to root and swap immediate children (unstable)
+hl.bind("SUPER + A", hl.dsp.layout("movetoroot active unstable"))
 
 -- Toggle the split direction of the current window
 hl.bind("SUPER + T", hl.dsp.layout("togglesplit"))

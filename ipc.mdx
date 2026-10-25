@@ -16,7 +16,7 @@ echo $HYPRLAND_INSTANCE_SIGNATURE
 
 The full base path for both sockets is:
 
-```
+```text
 $XDG_RUNTIME_DIR/hypr/$HYPRLAND_INSTANCE_SIGNATURE/
 ```
 
@@ -28,7 +28,7 @@ The file `.socket.sock` under the instance directory accepts hyprctl-style comma
 
 **Request format:**
 
-```
+```text
 [flags]/command args
 ```
 
@@ -49,13 +49,13 @@ Hyprland evaluates connections to this socket **completely synchronously**. An u
 
 The file `.socket2.sock` streams live compositor events to every connected client. Each event is a single newline-terminated line in the format:
 
-```
+```text
 EVENT>>DATA\n
 ```
 
 For example, when the user switches to workspace 2:
 
-```
+```text
 workspace>>2
 ```
 
@@ -143,7 +143,7 @@ Pattern-match on the event name with a trailing `*` glob so your script is robus
 </Tip>
 
 <CardGroup cols={2}>
-  <Card title="hyprctl Reference" icon="terminal">
+  <Card title="hyprctl Reference" icon="terminal" href="/configuring/advanced/hyprctl">
     All commands accepted by socket.sock mirror the `hyprctl` command-line interface. Refer to the hyprctl page for the full command list.
   </Card>
   <Card title="Hyprland Plugins" icon="puzzle-piece" href="/plugins/using-plugins">

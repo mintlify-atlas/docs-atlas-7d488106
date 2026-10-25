@@ -176,32 +176,6 @@ These commands change compositor state.
   ```
 </Accordion>
 
-<Accordion title="settitlebar">
-  Set the titlebar state for a window. Refer to the dispatcher documentation for window selector syntax.
-</Accordion>
-
-<Accordion title="plugin">
-  Manage compositor plugins.
-
-  ```sh
-  hyprctl plugin load /path/to/plugin.so
-  hyprctl plugin unload /path/to/plugin.so
-  hyprctl plugin list
-  ```
-
-  <Warning>
-    Loading plugins this way is subject to the `plugin` [permission](/configuring/advanced/permissions). Avoid blanket-allowing `hyprctl` to load plugins; use `ask` or `deny` to prevent malicious plugin injection via a compromised shell.
-  </Warning>
-</Accordion>
-
-<Accordion title="keyword">
-  Set a single config option by keyword without reloading the entire config.
-
-  ```sh
-  hyprctl keyword general:border_size 2
-  ```
-</Accordion>
-
 ---
 
 ## Info / Query Commands
@@ -240,12 +214,12 @@ These commands print compositor state and return `0` on success.
     | `animations` | Prints the current animation and bezier configuration. |
     | `rollinglog` | Prints the tail of the Hyprland log. Supports `-f`/`--follow`. |
     | `splash` | Prints the current random splash message. |
-    | `systeminfo` | Prints system information. |
     | `instances` | Lists all running Hyprland instances. |
     | `decorations [window]` | Lists decorations and their info for a window. |
     | `layouts` | Lists all available layouts, including those from plugins. |
+    | `locked` | Prints whether the current session is locked. |
+    | `descriptions` | Returns a JSON with all config options, their descriptions, and types. |
     | `submap` | Prints the currently active keybind submap. |
-    | `activespecial` | Prints the active special workspace on the focused monitor. |
   </Tab>
 </Tabs>
 
@@ -274,10 +248,6 @@ hyprctl getprop <window> <property>
   If `animationstyle` is unset, `(unset)` is returned. `min_size` defaults to `20 20`. `max_size` defaults to `inf inf` (or `[null,null]` in JSON output).
 </Note>
 
-### global
-
-Send a command to a global keybind handler registered by a plugin or external process.
-
 ---
 
 ## Batch Mode
@@ -285,7 +255,7 @@ Send a command to a global keybind handler registered by a plugin or external pr
 Pass the `--batch` flag to issue multiple semicolon-separated commands in a single compositor call. This is far more efficient than invoking `hyprctl` once per command in a loop.
 
 ```sh
-hyprctl --batch "keyword general.border_size 1 ; keyword general.gaps_out 5"
+hyprctl --batch "seterror disable ; notify -1 3000 0 Batch complete"
 ```
 
 <Warning>

@@ -1,5 +1,5 @@
 ---
-title: "Hypr* Developer Libraries and Toolkits"
+title: "Hypr* Developer Libraries: Rendering, Config and More"
 sidebarTitle: "Dev Libraries"
 description: "Reference guide to every developer-facing Hypr* library — rendering backends, graphics utilities, config parsing, Wayland protocol generation, and more."
 ---
@@ -18,7 +18,6 @@ The Hypr\* ecosystem ships a set of reusable C++ libraries that underpin Hyprlan
 
     **What it provides:**
     - KMS/DRM backend abstraction for direct GPU rendering
-    - Headless and virtual backends for testing
     - Clean C++ API consumed by Hyprland
 
     **Configuration:**
@@ -34,9 +33,8 @@ The Hypr\* ecosystem ships a set of reusable C++ libraries that underpin Hyprlan
     hyprgraphics provides common implementations of graphics-related operations that are needed across multiple Hypr\* projects. Instead of each project duplicating image loading, color math, and related helpers, they pull in hyprgraphics as a shared dependency.
 
     **What it provides:**
-    - Image loading utilities (multiple format support)
+    - Image loading utilities
     - Color calculation helpers
-    - Shared graphics primitives reused by Hyprland and companion apps
 
     **Where to find it:**
     [github.com/hyprwm/hyprgraphics](https://github.com/hyprwm/hyprgraphics)
@@ -77,13 +75,11 @@ The Hypr\* ecosystem ships a set of reusable C++ libraries that underpin Hyprlan
   <Card title="hyprutils" icon="wrench" href="https://github.com/hyprwm/hyprutils">
     **Shared utility types for the Hypr\* ecosystem.**
 
-    hyprutils provides the common C++ types and helpers that appear throughout every Hypr\* project — smart pointers, signals, math primitives, and other building blocks that would otherwise be copy-pasted across repositories.
+    hyprutils provides shared implementations of commonly used types across the Hypr\* ecosystem, replacing per-project duplications with a single well-maintained library.
 
     **What it provides:**
-    - Smart pointer types used consistently across the ecosystem
-    - Signal/event primitives
-    - Math and geometry helpers
-    - Utility functions shared by Hyprland, aquamarine, hyprtoolkit, and others
+    - Common C++ types and helpers used across every Hypr\* project
+    - Shared utility functions consumed by Hyprland, aquamarine, hyprtoolkit, and others
 
     **Where to find it:**
     [github.com/hyprwm/hyprutils](https://github.com/hyprwm/hyprutils)
@@ -103,12 +99,6 @@ The Hypr\* ecosystem ships a set of reusable C++ libraries that underpin Hyprlan
     - Drop-in alternative to `wayland-scanner` for C++ projects
     - Used by Hyprland to generate its private protocol implementations
 
-    **Usage pattern:**
-    ```sh
-    hyprwayland-scanner --client protocol.xml ./generated/
-    hyprwayland-scanner --server protocol.xml ./generated/
-    ```
-
     **Where to find it:**
     [github.com/hyprwm/hyprwayland-scanner](https://github.com/hyprwm/hyprwayland-scanner)
   </Card>
@@ -116,12 +106,11 @@ The Hypr\* ecosystem ships a set of reusable C++ libraries that underpin Hyprlan
   <Card title="hyprland-guiutils" icon="window" href="https://github.com/hyprwm/hyprland-guiutils">
     **Shared GUI utility library for Hyprland tooling.**
 
-    hyprland-guiutils is the successor to hyprland-qtutils, providing shared graphical utilities consumed by Hyprland's companion tools. It bridges the gap between the compositor and the helper applications that need to display UI within a Hyprland session.
+    hyprland-guiutils is the successor to hyprland-qtutils, providing shared graphical utilities consumed by Hyprland's companion tools.
 
     **What it provides:**
     - Shared GUI components reused across Hypr\* applications
-    - Successor to hyprland-qtutils with an updated API
-    - Consumed internally by tools like the XDPH share picker
+    - Successor to hyprland-qtutils
 
     **Where to find it:**
     [github.com/hyprwm/hyprland-guiutils](https://github.com/hyprwm/hyprland-guiutils)
@@ -138,7 +127,7 @@ The Hypr\* ecosystem ships a set of reusable C++ libraries that underpin Hyprlan
 
     **What it provides:**
     - `CBackend` and `CWindowBuilder` for application and window lifecycle
-    - Retained-mode element tree: `CRectangle`, `CButton`, `CColumnLayout`, `CRowLayout`, `CText`, `CImage`, and more
+    - Retained-mode element tree: `CRectangle`, `CButton`, `CColumnLayout`, `CRowLayout`, and more (see `hyprtoolkit/elements/`)
     - Absolute and layout (flex-like) positioning modes
     - `SizeType` variants: `ABSOLUTE`, `PERCENT`, `AUTO`
     - Palette-aware color system for automatic theme adherence

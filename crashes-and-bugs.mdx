@@ -97,13 +97,13 @@ If Hyprland crashes during normal use, report the issue on [GitHub](https://gith
   <Step title="Enable GDB file logging">
     Once you reach the `(gdb)` prompt, enable log output:
 
-    ```
+    ```text
     set logging enabled
     ```
 
     To write to a specific file instead of the default location:
 
-    ```
+    ```text
     set logging file output.log
     ```
   </Step>
@@ -111,7 +111,7 @@ If Hyprland crashes during normal use, report the issue on [GitHub](https://gith
   <Step title="Capture the full backtrace">
     Run the backtrace command, then exit:
 
-    ```
+    ```text
     bt -full
     exit
     ```
@@ -195,7 +195,7 @@ Bisecting finds the exact git commit that introduced a regression using binary s
 
     Repeat until Git identifies the first bad commit:
 
-    ```
+    ```text
     [commit hash] is the first bad commit
     ```
   </Step>

@@ -1,10 +1,10 @@
 ---
-title: "Running Hyprland on NVIDIA GPUs: Complete Setup Guide"
+title: "Running Hyprland on NVIDIA GPUs: Driver Setup Guide"
 sidebarTitle: NVIDIA
-description: Set up NVIDIA GPUs with Hyprland using proprietary drivers, required environment variables, hardware cursor fixes, and solutions to common issues.
+description: Set up NVIDIA GPUs with Hyprland using the official proprietary drivers. Includes links to the Arch and NixOS wikis for distro-specific installation.
 ---
 
-NVIDIA GPUs can work well with Hyprland, but they require a few extra configuration steps compared to AMD or Intel hardware. For maximum performance, the proprietary NVIDIA drivers with open-source kernel modules are recommended for modern GPUs. Because these drivers are still closed-source, some issues may arise that the Hyprland team has no direct control over — however, the driver quality has been steadily improving, and a smooth, near-parity experience with other GPU vendors is achievable.
+NVIDIA GPUs can work with Hyprland, but require a few extra configuration steps compared to AMD or Intel hardware. For maximum performance, the proprietary NVIDIA drivers with open-source kernel modules are recommended for modern GPUs. Because the official drivers are still proprietary, some issues may arise that the Hyprland team has no direct control over — however, driver quality has been steadily improving, and a smooth, near-parity experience with other GPU vendors is achievable.
 
 ## Installing the Drivers
 
@@ -19,82 +19,9 @@ There are no distro-agnostic instructions for installing NVIDIA drivers. For the
   </Card>
 </CardGroup>
 
-## Required Environment Variables
-
-Once your drivers are installed, you need to set several environment variables so that Hyprland and the rest of the graphics stack use the correct backends. Add these to your `hyprland.lua`:
-
-```lua
-hl.env("LIBVA_DRIVER_NAME", "nvidia")
-hl.env("__GLX_VENDOR_LIBRARY_NAME", "nvidia")
-```
-
-<Note>
-  `GBM_BACKEND` and `WLR_NO_HARDWARE_CURSORS` may also be required depending on your driver version and setup. See the sections below for details.
-</Note>
-
-### GBM Backend
-
-Some configurations require explicitly setting the GBM backend to the NVIDIA implementation:
-
-```lua
-hl.env("GBM_BACKEND", "nvidia-drm")
-```
-
-If you experience a black screen or compositor startup failures, try adding this variable.
-
-### Hardware Cursor Fix
-
-Older NVIDIA driver versions do not support hardware cursors on Wayland, which can cause the cursor to be invisible or to flicker. If you run into this issue, disable hardware cursors:
-
-```lua
-hl.env("WLR_NO_HARDWARE_CURSORS", "1")
-```
-
-<Tip>
-  Newer NVIDIA drivers (555+) include proper hardware cursor support. If you are on a recent driver, you may not need this variable at all. Try without it first.
-</Tip>
-
-## Summary of Environment Variables
-
-<Accordion title="All NVIDIA environment variables at a glance">
-
-```lua
--- VA-API driver selection for hardware video decoding
-hl.env("LIBVA_DRIVER_NAME", "nvidia")
-
--- Force GLX to use the NVIDIA vendor library
-hl.env("__GLX_VENDOR_LIBRARY_NAME", "nvidia")
-
--- Set GBM backend (add if you get a black screen)
-hl.env("GBM_BACKEND", "nvidia-drm")
-
--- Disable hardware cursors (add if cursor is invisible/flickering)
-hl.env("WLR_NO_HARDWARE_CURSORS", "1")
-```
-
-</Accordion>
-
-## Common Issues and Solutions
-
-<Accordion title="Black screen on startup">
-  Ensure `GBM_BACKEND=nvidia-drm` is set and that the `nvidia-drm` kernel module is loaded with `modeset=1`. On most distros this means adding `nvidia-drm.modeset=1` to your kernel parameters.
-</Accordion>
-
-<Accordion title="Cursor is invisible or flickers">
-  Add `WLR_NO_HARDWARE_CURSORS=1` to your environment. This disables hardware cursor planes and falls back to software rendering for the cursor.
-</Accordion>
-
-<Accordion title="Screen tearing or visual glitches">
-  Make sure you are using the proprietary driver with the open-source kernel modules (available since driver version 515). The legacy open-source `nouveau` driver does not provide the necessary Wayland support.
-</Accordion>
-
-<Accordion title="Applications crash or show incorrect rendering">
-  Some applications rely on `EGL` or `Vulkan` directly. Setting `__EGL_VENDOR_LIBRARY_FILELIST` or ensuring the `libEGL_nvidia` library is correctly linked can help. Consult the Arch or NixOS wiki for distro-specific advice.
-</Accordion>
-
 ## Still Having Issues?
 
-If you have followed all the steps above and are still experiencing problems, the Hyprland community is ready to help.
+If you have followed the driver setup guide for your distro and are still experiencing problems, the Hyprland community is ready to help.
 
 <Card title="Hyprland Discord — #hyprland-nvidia" icon="discord" href="https://discord.gg/hQ9XvMUjjr">
   Join the Hyprland Discord server and ask in the `#hyprland-nvidia` channel for community support specific to NVIDIA setups.

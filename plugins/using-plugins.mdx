@@ -77,8 +77,10 @@ This loads all currently enabled plugins into the live Hyprland instance. Run th
 <Tip>
 Add `hyprpm reload` to your Hyprland autostart section so plugins are loaded automatically on every login. Use the `-n` flag to display a notification when loading succeeds:
 
-```sh
-exec-once = hyprpm reload -n
+```lua
+hl.on("hyprland.start", function()
+    hl.exec_cmd("hyprpm reload -n")
+end)
 ```
 
 Warning and error notifications are always shown regardless of whether `-n` is passed.

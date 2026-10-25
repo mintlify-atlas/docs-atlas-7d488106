@@ -1,7 +1,7 @@
 ---
-title: "Window, Layer, and Workspace Rules in Hyprland"
+title: "Hyprland Window, Layer, and Workspace Rule Reference"
 sidebarTitle: "Rules"
-description: "Reference for Hyprland rules: window rules with static and dynamic effects, layer rules for bars and launchers, and per-workspace layout rules."
+description: "Reference for Hyprland window, layer, and workspace rules: static and dynamic effects, match props, layer namespaces, and per-workspace layout options."
 ---
 
 Rules allow you to enforce specific behaviour for matched windows, layers, and workspaces. Each rule is composed of **props** (inside the `match` table) that determine what to target, and **effects** (outside `match`) that define what to apply. All props must match for the rule to fire.
@@ -120,6 +120,7 @@ Dynamic effects are re-evaluated whenever the matched property changes. They can
 | `no_shortcuts_inhibit` | Prevent the app from inhibiting shortcuts | bool |
 | `no_vrr` | Disable VRR for this window (requires `misc.vrr = 2` or `3`) | bool |
 | `no_wobble` | Disable wobble effect | bool |
+| `no_xdg_drags` | Disable XDG-driven drags (e.g. dragging a CSD top bar) | bool |
 | `opacity` | Opacity string: `"0.8"`, `"0.9 0.7"`, `"1.0 0.8 0.9"`. Append `" override"` for absolute values | string |
 | `opaque` | Set all opacity values to 1 for this window | bool |
 | `force_rgbx` | Disable the window's own transparency | bool |
@@ -127,7 +128,10 @@ Dynamic effects are re-evaluated whenever the matched property changes. They can
 | `render_unfocused` | Force window to render even when not visible | bool |
 | `rounding` | Force X pixels of corner rounding | int |
 | `rounding_power` | Override rounding curve | float |
+| `scroll_mouse` | Override `input.scroll_factor` for this window | float |
+| `scroll_touchpad` | Override `input.touchpad.scroll_factor` for this window | float |
 | `stay_focused` | Keep focus on the window as long as it's visible | bool |
+| `sync_fullscreen` | Keep internal fullscreen mode in sync with what is sent to the window | bool |
 | `tag` | Apply/remove a dynamic tag: `"+myTag"`, `"-myTag"`, `"myTag"` (toggle) | string |
 | `tonemap` | Tonemapping: `"on"`, `"off"`, `"clamp"`, `"limited"` | string |
 | `xray` | Set blur xray mode | bool |

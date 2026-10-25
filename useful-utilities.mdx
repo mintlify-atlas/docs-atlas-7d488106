@@ -1,5 +1,5 @@
 ---
-title: "Recommended Wayland Utilities for Hyprland"
+title: "Recommended Wayland Tools and Utilities for Hyprland"
 sidebarTitle: "Useful Utilities"
 description: "Community-curated Wayland utilities for Hyprland: status bars, wallpapers, launchers, clipboard managers, screen sharing, phone tools, and more."
 ---
@@ -216,8 +216,7 @@ Hyprland is a compositor, not a full desktop environment, which means certain pi
   - [**clipse**](https://github.com/savedra1/clipse) — TUI clipboard manager with image/text previews, multi-select, pinned items, auto-paste, and custom themes. Bind to a floating terminal window.
 
     ```lua
-    hl.bind("SUPER + V", hl.dsp.exec_cmd("kitty --class clipse -e clipse",
-        { float = true, size = {622, 652}, stay_focused = true }))
+    hl.bind("SUPER + V", hl.dsp.exec_cmd("kitty --class clipse -e clipse"))
     ```
 
   - [**clipman**](https://github.com/chmouel/clipman) — text-only Wayland clipboard manager using `wl-clipboard`.
@@ -238,10 +237,6 @@ Hyprland is a compositor, not a full desktop environment, which means certain pi
     # Pick a color, copy lowercase hex to clipboard
     hyprpicker --autocopy --format=hex --lowercase-hex
     ```
-
-  <Info>
-    hyprpicker is currently the only Wayland color picker that supports fractional scaling and a live hex preview.
-  </Info>
 </Accordion>
 
 <Accordion title="App Clients">
@@ -273,20 +268,7 @@ Hyprland is a compositor, not a full desktop environment, which means certain pi
 
   **Xwayland applications**
 
-  Apps running under Xwayland (Discord, Skype) can only see other Xwayland windows and cannot share a Wayland screen directly. Use [xwaylandvideobridge](https://invent.kde.org/system/xwaylandvideobridge) as a workaround. Add window rules to hide its main window:
-
-  ```lua
-  hl.window_rule({
-      name  = "xwayland-video-bridge-fixes",
-      match = { class = "xwaylandvideobridge" },
-      no_initial_focus = true,
-      no_focus  = true,
-      no_anim   = true,
-      no_blur   = true,
-      max_size  = {1, 1},
-      opacity   = 0.0,
-  })
-  ```
+  Apps running under Xwayland (Discord, Skype) can only see other Xwayland windows and cannot share a Wayland screen directly. Use [xwaylandvideobridge](https://invent.kde.org/system/xwaylandvideobridge) as a workaround. Add window rules to the `xwaylandvideobridge` class to hide it: set `nofocus`, `noanim`, `noblur`, `maxsize 1 1`, and `opacity 0` in your Hyprland config rules.
 </Accordion>
 
 <Accordion title="Phone Connect">

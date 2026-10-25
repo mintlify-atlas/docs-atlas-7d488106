@@ -1,7 +1,7 @@
 ---
-title: "Autostarting Applications in Hyprland"
+title: "Hyprland Autostart: Launch and Shutdown Event Hooks"
 sidebarTitle: "Autostart"
-description: "Learn how to autostart programs when Hyprland launches, and how to run cleanup commands on shutdown, using Hyprland's Lua event system."
+description: "Learn how to autostart programs when Hyprland launches and run cleanup commands on shutdown using the hyprland.start and hyprland.shutdown Lua events."
 ---
 
 Hyprland's configuration is Lua-based, which means you can autostart applications by listening to lifecycle events rather than maintaining a static list of commands. The `hyprland.start` event fires once after Hyprland has fully initialised, making it the right place to launch your bar, wallpaper tool, notification daemon, and anything else your desktop needs.
