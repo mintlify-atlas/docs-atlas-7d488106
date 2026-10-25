@@ -1,0 +1,121 @@
+---
+title: "XWayland in Hyprland: HiDPI Scaling, Sockets, and Tips"
+sidebarTitle: XWayland
+description: Learn what XWayland does, how to fix HiDPI scaling for legacy X11 apps, configure abstract Unix domain sockets, and force apps to run natively on Wayland.
+---
+
+XWayland is the bridging mechanism that allows legacy X11 (Xorg) applications to run inside a Wayland compositor like Hyprland. It translates X11 protocol calls into Wayland equivalents, so programs that have not yet been ported to native Wayland can still function. While most modern applications now support Wayland natively, XWayland remains necessary for a significant number of tools, games, and older applications.
+
+## HiDPI XWayland
+
+XWayland cannot natively scale its output because Xorg has no concept of per-monitor scaling. On HiDPI screens this results in tiny, pixelated windows for X11 applications.
+
+The recommended workaround is to set `force_zero_scaling` to `true`, which prevents Xwayland windows from being scaled by the compositor. This removes the pixelation, but each toolkit then needs its own environment variable to instruct it to render at a higher logical DPI.
+
+```lua
+-- Change monitor to high resolution; the last argument is the scale factor
+hl.monitor({ output = "", mode = "highres", position = "auto", scale = "2" })
+
+-- Unscale XWayland
+hl.config({
+  xwayland = {
+    force_zero_scaling = true
+  }
+})
+
+-- Toolkit-specific scale
+hl.env("GDK_SCALE", "2")
+hl.env("XCURSOR_SIZE", "32")
+```
+
+`GDK_SCALE` will not conflict with Wayland-native GTK applications — it is only respected by the X11/GDK-X11 backend.
+
+<Warning>
+  XWayland HiDPI patches (external kernel or XWayland patches that provided native fractional scaling) are no longer supported. Do not use them.
+</Warning>
+
+## Abstract Unix Domain Socket
+
+X11 applications communicate with XWayland over Unix domain sockets. On Linux, `libX11` prefers the **abstract** Unix domain socket, which lives in a separate namespace independent of the filesystem.
+
+Abstract sockets are more flexible but are harder to isolate in some sandbox environments, such as Flatpak. To help with this, Hyprland provides the `create_abstract_socket` option. When disabled, XWayland will only create the regular (filesystem-based) Unix domain socket:
+
+```lua
+hl.config({
+  xwayland = {
+    create_abstract_socket = false
+  }
+})
+```
+
+<Note>
+  Disabling the abstract socket has [potential security and compatibility implications](https://gitlab.gnome.org/GNOME/mutter/-/issues/1613). Only disable it if you have a specific sandboxing reason to do so. Abstract Unix domain sockets are a Linux-only feature.
+</Note>
+
+## Forcing Applications to Use Native Wayland
+
+Many applications support Wayland natively but default to the XWayland backend for compatibility reasons. You can override this with environment variables:
+
+<Tabs>
+  <Tab title="Electron Apps">
+    ```bash
+    # Add to your environment or launch script
+    ELECTRON_OZONE_PLATFORM_HINT=auto
+    ```
+
+    Or pass flags directly when launching:
+
+    ```bash
+    electron-app --ozone-platform=wayland
+    ```
+  </Tab>
+  <Tab title="GTK Apps">
+    ```bash
+    GDK_BACKEND=wayland
+    ```
+  </Tab>
+  <Tab title="Qt Apps">
+    ```bash
+    QT_QPA_PLATFORM=wayland
+    ```
+  </Tab>
+  <Tab title="SDL Apps">
+    ```bash
+    SDL_VIDEODRIVER=wayland
+    ```
+  </Tab>
+</Tabs>
+
+<Tip>
+  Setting these in your Hyprland config with `hl.env(...)` will apply them globally to all applications launched from Hyprland:
+
+  ```lua
+  hl.env("GDK_BACKEND", "wayland,x11,*")
+  hl.env("QT_QPA_PLATFORM", "wayland;xcb")
+  hl.env("SDL_VIDEODRIVER", "wayland")
+  hl.env("ELECTRON_OZONE_PLATFORM_HINT", "auto")
+  ```
+</Tip>
+
+## Enabling or Disabling XWayland
+
+XWayland is enabled by default. To disable it entirely (for a fully Wayland-only setup):
+
+```lua
+hl.config({
+  xwayland = {
+    enabled = false
+  }
+})
+```
+
+On NixOS, you can also disable XWayland at the package level:
+
+```nix
+{
+  programs.hyprland = {
+    enable = true;
+    xwayland.enable = false;
+  };
+}
+```

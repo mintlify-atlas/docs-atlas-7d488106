@@ -1,0 +1,325 @@
+---
+title: "The Hypr* Ecosystem: User Apps and Utilities"
+sidebarTitle: "User Apps"
+description: "A complete guide to every user-facing Hypr* application — from screen locking and wallpapers to launchers, portals, and Qt theming tools."
+---
+
+The Hypr\* ecosystem is a suite of first-party tools built and maintained by the Hyprland development team. Each application is purpose-built for Wayland, integrates tightly with Hyprland, and follows the same configuration conventions you are already familiar with from the compositor itself. This page covers every user-facing tool: what it does, how to install it, and its most important features.
+
+<Note>
+  Unless otherwise noted, all Hypr\* tools read their configuration from `~/.config/hypr/`. Most are available in major Linux distribution repositories and the Hyprland overlay on NixOS.
+</Note>
+
+<CardGroup cols={2}>
+  <Card title="hyprlock" icon="lock" href="https://github.com/hyprwm/hyprlock">
+    **GPU-accelerated screen locker for Hyprland.**
+
+    hyprlock is a fast, multi-threaded screen locker that renders entirely on the GPU. It is configured via `~/.config/hypr/hyprlock.conf` (or `$XDG_CONFIG_HOME/hypr/hyprlock.conf`). A config file is **required** — hyprlock exits with an error if none is found.
+
+    **Key features:**
+    - Widget-based layout system: `background`, `image`, `shape`, `input-field`, and `label` widgets
+    - Variable substitution in labels (`$USER`, `$TIME`, `$ATTEMPTS`, `$FAIL`, etc.)
+    - Dynamic labels powered by shell commands with configurable update intervals
+    - PAM authentication plus optional parallel fingerprint auth via fprintd
+    - Configurable animations with a full animation tree (`fade`, `fadeIn`, `fadeOut`, `inputFieldColors`, etc.)
+    - Fractional scaling support and GPU/CPU screencopy modes
+    - `SIGUSR1` to unlock programmatically; `SIGUSR2` to force-refresh labels and images
+
+    <Warning>
+      Without a valid config file hyprlock will **not** lock the session. Copy the [example config](https://github.com/hyprwm/hyprlock/blob/main/assets/example.conf) as a starting point.
+    </Warning>
+  </Card>
+
+  <Card title="hypridle" icon="moon" href="https://github.com/hyprwm/hypridle">
+    **Idle management daemon for Hyprland.**
+
+    hypridle listens for idle events and fires configurable commands when the system has been idle for a defined number of seconds. It also responds to D-Bus lock/unlock signals and the logind `PrepareForSleep` event. Configure it at `~/.config/hypr/hypridle.conf`; a config file is required.
+
+    **Key features:**
+    - Unlimited `listener` blocks, each with independent `timeout`, `on-timeout`, and `on-resume` commands
+    - `condition_cmd` support: gate `on-timeout` on external state (e.g., skip suspend while SSH is connected)
+    - `condition_retry` for periodic re-checks while the system stays idle
+    - `general:before_sleep_cmd` and `general:after_sleep_cmd` for suspend/hibernate handling
+    - `general:inhibit_sleep` modes including lock-notify mode that waits for the session to be truly locked before releasing the sleep inhibitor
+    - Per-listener `ignore_inhibit` flag to bypass Wayland/D-Bus/systemd idle inhibitors
+
+    ```ini
+    # ~/.config/hypr/hypridle.conf
+    general {
+        lock_cmd = pidof hyprlock || hyprlock
+        before_sleep_cmd = loginctl lock-session
+    }
+    listener {
+        timeout = 300
+        on-timeout = loginctl lock-session
+    }
+    listener {
+        timeout = 1800
+        on-timeout = systemctl suspend
+    }
+    ```
+  </Card>
+
+  <Card title="hyprpaper" icon="image" href="https://github.com/hyprwm/hyprpaper">
+    **Fast, IPC-controlled wallpaper utility.**
+
+    hyprpaper sets per-monitor wallpapers and supports live changes over IPC without restarting. It reads `~/.config/hypr/hyprpaper.conf` (optional). Add `hyprpaper` to your Hyprland autostart section to launch it on login.
+
+    **Key features:**
+    - Per-monitor `wallpaper {}` blocks with `monitor`, `path`, `fit_mode` (`contain`, `cover`, `tile`, `fill`), `timeout`, `order`, and `recursive` options
+    - Directory-based wallpaper rotation with configurable interval and random order
+    - Fallback wallpaper for unconfigured monitors (set `monitor =` empty)
+    - IPC via `hyprctl hyprpaper wallpaper` and `hyprctl hyprpaper listactive`
+    - Optional Hyprland splash overlay with configurable opacity and vertical offset
+    - `source =` keyword for splitting config across multiple files
+
+    ```sh
+    # Change wallpaper live without restarting
+    hyprctl hyprpaper wallpaper "eDP-1,~/Pictures/new.jpg,cover"
+    hyprctl hyprpaper listactive
+    ```
+  </Card>
+
+  <Card title="hyprcursor" icon="arrow-pointer" href="https://github.com/hyprwm/hyprcursor">
+    **Next-generation cursor theme format for Wayland.**
+
+    hyprcursor replaces the legacy XCursor format with a modern, resolution-independent alternative. Hyprland uses it natively; apps that still require XCursor fall back automatically.
+
+    **Key features:**
+    - Vector-based themes stored in `~/.local/share/icons` or `~/.icons`
+    - Set theme and size via `HYPRCURSOR_THEME` and `HYPRCURSOR_SIZE` environment variables, or with `hyprctl setcursor`
+    - Apps without server-side cursor support (e.g., GTK) fall back to XCursor; set `XCURSOR_THEME`/`XCURSOR_SIZE` for those
+    - Flatpak apps need filesystem overrides: `flatpak override --filesystem=~/.icons:ro --user`
+    - Theme creation and porting tools available in the `hyprcursor-util/` directory of the repo
+
+    ```lua
+    -- hyprland.lua
+    hl.env("HYPRCURSOR_THEME", "MyCursor")
+    hl.env("HYPRCURSOR_SIZE", "24")
+    ```
+  </Card>
+
+  <Card title="hyprpicker" icon="eyedropper" href="https://github.com/hyprwm/hyprpicker">
+    **Wayland-native screen color picker.**
+
+    hyprpicker freezes the screen, lets you click any pixel, and outputs its color value. No persistent daemon or config file is required — it is driven entirely by command-line flags.
+
+    **Key features:**
+    - Output formats: `hex`, `rgb`, `hsl`, `hsv`, `cmyk`, or a custom format string
+    - `--autocopy` / `-a` to copy the result directly to the clipboard (requires `wl-clipboard`)
+    - `--notify` / `-n` to send a desktop notification on pick (requires `notify-send`)
+    - Zoom lens with configurable scale (`-s`) and radius (`-u`)
+    - `--render-inactive` to freeze all outputs, not just the active one
+    - `--name` / `-N` to copy the standard CSS color name when matched
+    - `--lowercase-hex` / `-l` for lowercase hex output
+
+    ```sh
+    # Pick a color and copy as lowercase hex
+    hyprpicker --autocopy --format=hex --lowercase-hex
+    ```
+  </Card>
+
+  <Card title="hyprpolkitagent" icon="shield-check" href="https://github.com/hyprwm/hyprpolkitagent">
+    **Polkit authentication agent for Hyprland.**
+
+    hyprpolkitagent is required for GUI applications to request elevated privileges. It opens a native dialog asking for a password whenever an app needs to escalate permissions. Themes follow your hyprtoolkit configuration automatically.
+
+    **Key features:**
+    - Integrates with PAM, including optional empty-password submission for alternative auth methods (e.g., face recognition via Howdy)
+    - Configurable dialog dimensions and password field width
+    - Toggleable action/command detail panel via `show_details`
+    - Config at `~/.config/hyprpolkitagent/hyprpolkitagent.conf` (optional)
+
+    **Autostart:**
+    ```ini
+    # In your Hyprland config exec-once:
+    exec-once = systemctl --user start hyprpolkitagent
+    ```
+
+    <Tip>
+      On distributions without a systemd user session, the binary may be at `/usr/lib64/libexec/hyprpolkitagent` or `/usr/libexec/hyprpolkitagent`.
+    </Tip>
+  </Card>
+
+  <Card title="hyprsunset" icon="sun" href="https://github.com/hyprwm/hyprsunset">
+    **Blue-light filter and gamma control daemon.**
+
+    hyprsunset adjusts color temperature and perceived screen brightness on a time-based schedule. Unlike screen shaders, its changes are **not** captured by screenshot or recording tools. Configure it at `~/.config/hypr/hyprsunset.conf`.
+
+    **Key features:**
+    - Time-based `profile {}` blocks activated automatically at the specified `time`
+    - Per-profile `temperature` (color warmth), `gamma` (perceived brightness), and `identity` (gamma-only mode)
+    - `on-switch` command executed when a profile activates (e.g., toggle GTK dark/light theme)
+    - Full IPC via `hyprctl hyprsunset temperature`, `gamma`, `identity`, `reset`, and `profile`
+    - `max-gamma` cap to prevent accidental over-brightening
+
+    ```sh
+    # Keybinds for brightness via gamma
+    hyprctl hyprsunset gamma +10
+    hyprctl hyprsunset gamma -10
+    # Disable blue-light filter
+    hyprctl hyprsunset identity
+    ```
+
+    <Warning>
+      Using gamma control degrades color accuracy. Prefer monitor hardware controls when available.
+    </Warning>
+  </Card>
+
+  <Card title="hyprsysteminfo" icon="circle-info" href="https://github.com/hyprwm/hyprsysteminfo">
+    **System information GUI for Hyprland.**
+
+    hyprsysteminfo is a compact GUI application that displays your current system information and makes it easy to copy the Hyprland version string or full system info to the clipboard — ideal for filing bug reports or sharing your setup.
+
+    **Key features:**
+    - Displays Hyprland version and system details at a glance
+    - One-click clipboard copy of version and system info
+    - Lightweight GUI with no background daemon
+
+    <Tip>
+      Run `hyprsysteminfo` before filing a Hyprland bug report to quickly copy the exact version string needed by maintainers.
+    </Tip>
+  </Card>
+
+  <Card title="hyprpwcenter" icon="sliders" href="https://github.com/hyprwm/hyprpwcenter">
+    **PipeWire control center GUI.**
+
+    hyprpwcenter is a graphical control panel for PipeWire. It exposes the audio graph visually so you can inspect and reconfigure nodes, outputs, and routing without touching the command line.
+
+    **Key features:**
+    - Browse and configure PipeWire nodes and outputs
+    - Adjust the full PipeWire audio graph interactively
+    - Native Wayland GUI — no background service required beyond PipeWire itself
+
+    <Info>
+      hyprpwcenter complements `hyprpolkitagent` for a fully Hypr-native desktop: audio routing handled without pulling in full DE dependencies.
+    </Info>
+  </Card>
+
+  <Card title="hyprlauncher" icon="magnifying-glass" href="https://github.com/hyprwm/hyprlauncher">
+    **First-party multipurpose launcher for Hyprland.**
+
+    hyprlauncher runs as a persistent daemon and opens a launcher window on demand. It supports multiple finders and is configured at `~/.config/hypr/hyprlauncher.conf`. Theming follows your hyprtoolkit theme.
+
+    **Key features:**
+    - Always-daemon model: `hyprlauncher -d` to start without opening a window; subsequent invocations open it instantly
+    - Built-in finders: `desktop` (app launcher), `math` (expression evaluator), `unicode` (character picker), `font` (font browser)
+    - Configurable prefix characters to switch finders inline (e.g., `=` for math, `.` for Unicode)
+    - `desktop_launch_prefix` for integration with uwsm (`uwsm app -- `)
+    - Persistent usage cache stored at `~/.local/share/hyprlauncher`
+    - Configurable window size and keyboard focus grab behavior
+
+    ```ini
+    # ~/.config/hypr/hyprlauncher.conf
+    general {
+        grab_focus = true
+    }
+    finders {
+        math_prefix = =
+        unicode_prefix = .
+        desktop_launch_prefix = uwsm app --
+    }
+    ```
+  </Card>
+
+  <Card title="hyprshutdown" icon="power-off" href="https://github.com/hyprwm/hyprshutdown">
+    **Graceful session shutdown utility.**
+
+    hyprshutdown opens a GUI dialog that asks each running application to close cleanly before exiting Hyprland. This is the **recommended** way to end a Hyprland session; using `dispatch exit` forcibly kills processes instead of letting them save state.
+
+    **Key features:**
+    - Graceful per-app close requests before Hyprland exits
+    - `--post-cmd` to run a command after Hyprland exits (e.g., `shutdown -P 0` or `reboot`)
+    - `--vt N` to switch virtual terminals after logout (fixes NVIDIA + SDDM black screen)
+    - `--dry-run` to preview the dialog without performing any action
+    - `--no-exit` to close apps without quitting Hyprland
+    - Custom dialog title text via `--top-label` / `-t`
+
+    ```sh
+    # Shut down the system gracefully
+    hyprshutdown -t 'Shutting down...' --post-cmd 'shutdown -P 0'
+    # Reboot
+    hyprshutdown -t 'Restarting...' --post-cmd 'reboot'
+    ```
+  </Card>
+
+  <Card title="hyprland-qt-support" icon="paintbrush" href="https://github.com/hyprwm/hyprland-qt-support">
+    **QML style plugin for Hypr\* Qt6 apps.**
+
+    hyprland-qt-support provides the QML style layer used by all Hypr\* Qt6 applications. It ensures a consistent visual language across the ecosystem and is configured via `~/.config/hypr/application-style.conf`.
+
+    **Configuration options:**
+
+    | Variable | Description | Default |
+    |---|---|---|
+    | `roundness` | UI element rounding (0–3) | `1` |
+    | `border_width` | Border width around UI elements (0–3) | `1` |
+    | `reduce_motion` | Reduce transitions and hover effects | `false` |
+
+    <Info>
+      This package is a dependency of other Hypr\* Qt apps. Install it alongside hyprpolkitagent, hyprlauncher, and hyprshutdown.
+    </Info>
+  </Card>
+
+  <Card title="hyprqt6engine" icon="palette" href="https://github.com/hyprwm/hyprqt6engine">
+    **Qt6 platform theme engine for Hyprland.**
+
+    hyprqt6engine is a drop-in replacement for `qt6ct` that integrates with KColorScheme-compatible themes and keeps Qt6 apps visually consistent with your Hyprland setup. Configure at `~/.config/hypr/hyprqt6engine.conf`.
+
+    **Key features:**
+    - Activate by setting `QT_QPA_PLATFORMTHEME=hyprqt6engine`
+    - Accepts qt6ct color schemes **and** KColorScheme files via `theme:color_scheme`
+    - Configurable icon theme, widget style (Fusion, kvantum-dark, etc.), and font settings
+    - `misc:single_click_activate`, `misc:menus_have_icons`, `misc:shortcuts_for_context_menus` tweaks
+
+    ```sh
+    # Set system-wide (or add as env= in Hyprland config)
+    echo "QT_QPA_PLATFORMTHEME=hyprqt6engine" | sudo tee -a /etc/environment
+    ```
+  </Card>
+
+  <Card title="xdg-desktop-portal-hyprland" icon="share-nodes" href="https://github.com/hyprwm/xdg-desktop-portal-hyprland">
+    **Hyprland's XDG Desktop Portal implementation.**
+
+    xdg-desktop-portal-hyprland (XDPH) bridges Hyprland with applications that use the XDG Desktop Portal D-Bus API — enabling screen sharing, global shortcuts, and more. It starts automatically via D-Bus when Hyprland launches.
+
+    **Key features:**
+    - Screen sharing via PipeWire with a native Qt share picker
+    - Window-level sharing (Hyprland-only feature)
+    - Global shortcuts portal
+    - Configurable screencopy FPS cap, SHM fallback mode, restore tokens, and cursor mode
+    - Config at `~/.config/hypr/xdph.conf`
+
+    <Warning>
+      XDPH does **not** implement a file picker. Install `xdg-desktop-portal-gtk` or `xdg-desktop-portal-kde` alongside it for file dialog support.
+    </Warning>
+
+    ```sh
+    # Arch Linux
+    pacman -S xdg-desktop-portal-hyprland
+    # Check status
+    systemctl --user status xdg-desktop-portal-hyprland
+    ```
+  </Card>
+
+  <Card title="hyprtoolkit" icon="toolbox" href="https://github.com/hyprwm/hyprtoolkit">
+    **Wayland GUI toolkit for Hypr\* applications.**
+
+    hyprtoolkit is the native C++ GUI toolkit that powers Hypr\* applications like hyprlauncher, hyprshutdown, and hyprpolkitagent. Users interact with it through its theme configuration at `~/.config/hypr/hyprtoolkit.conf`.
+
+    **Theming variables (selection):**
+
+    | Variable | Description | Default |
+    |---|---|---|
+    | `background` | Window background color | `0xFF181818` |
+    | `accent` | Primary accent color | `0xFF00FFCC` |
+    | `accent_secondary` | Secondary accent color | `0xFF0099F0` |
+    | `font_family` | Regular font family | `Sans Serif` |
+    | `rounding_large` | Large corner radius (logical px) | `10` |
+    | `rounding_small` | Small corner radius (logical px) | `5` |
+
+    <Tip>
+      Changes to `hyprtoolkit.conf` apply to all Hypr\* apps that use the toolkit. Restart each app for the new theme to take effect.
+    </Tip>
+  </Card>
+</CardGroup>

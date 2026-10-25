@@ -1,0 +1,141 @@
+---
+title: "Master Layout: Primary and Stack Window Tiling in Hyprland"
+sidebarTitle: Master
+description: "Use Hyprland's Master layout to designate one or more master windows in a primary area, with remaining windows in a configurable slave stack."
+---
+
+The Master layout divides the workspace into two regions: a **master** area that holds one or more primary windows, and a **slave stack** that holds all remaining windows. By default the master area sits on the left and the slave stack tiles vertically on the right, but orientation can be changed globally or on a per-workspace basis. This layout is inspired by classic tiling window managers such as dwm and xmonad.
+
+## How It Works
+
+When a new window opens, it is placed into the slave stack (by default). You can promote any slave to master using the `swapwithmaster` layout message, or configure `new_status = "master"` to make every new window immediately become the master. The master area width is controlled by `mfact` — a value between `0.0` and `1.0` representing the percentage of the screen the master area occupies.
+
+## Config
+
+All options below belong to the `master` configuration category.
+
+| Name | Description | Type | Default | Limits |
+| --- | --- | --- | --- | --- |
+| `allow_small_split` | Enable adding additional master windows in a horizontal split style | bool | `false` | |
+| `special_scale_factor` | The scale of windows on the special workspace | float | `1.0` | 0.0–1.0 |
+| `mfact` | Master area size as a fraction of the screen (e.g., `0.70` = master takes 70%, slaves take 30%) | float | `0.55` | 0.0–1.0 |
+| `new_status` | `"master"` — new window becomes master; `"slave"` — new windows join the slave stack; `"inherit"` — inherit status from the focused window | string | `"slave"` | |
+| `new_on_top` | When `true`, newly opened windows appear at the top of the stack | bool | `false` | |
+| `new_on_active` | `"before"` / `"after"` — place new window relative to the focused window; `"none"` — follow `new_on_top` | string | `"none"` | |
+| `orientation` | Default placement of the master area | string | `"left"` | `"left"`, `"right"`, `"top"`, `"bottom"`, `"center"` |
+| `slave_count_for_center_master` | When `orientation = center`, center the master only when at least this many slave windows are open. Set `0` to always center | int | `2` | 0–10 |
+| `center_master_fallback` | Fallback orientation when slaves are fewer than `slave_count_for_center_master` | string | `"left"` | `"left"`, `"right"`, `"top"`, `"bottom"` |
+| `smart_resizing` | When enabled, resize direction follows the mouse's proximity to a corner. Otherwise it is based on tiling position | bool | `true` | |
+| `drop_at_cursor` | When enabled, dragging and dropping a window places it at the cursor position. Otherwise it goes to the top/bottom of the stack per `new_on_top` | bool | `true` | |
+| `always_keep_position` | Keep the master window in its configured position even when there are no slave windows | bool | `false` | |
+| `focus_master_on_close` | When a window is closed, automatically focus the master window | bool | `false` | |
+
+### Example Configuration
+
+```lua
+master {
+    mfact             = 0.6
+    new_status        = "slave"
+    orientation       = "left"
+    smart_resizing    = true
+    focus_master_on_close = true
+}
+```
+
+## Orientations
+
+The `orientation` option controls where the master area sits on the workspace. You can change orientation globally in config or per-workspace using layout messages at runtime.
+
+<Tabs>
+  <Tab title="left (default)">
+    Master area on the left, slave windows tile vertically on the right.
+  </Tab>
+  <Tab title="right">
+    Master area on the right, slave windows tile vertically on the left.
+  </Tab>
+  <Tab title="top">
+    Master area on the top, slave windows tile horizontally below.
+  </Tab>
+  <Tab title="bottom">
+    Master area on the bottom, slave windows tile horizontally above.
+  </Tab>
+  <Tab title="center">
+    Master area centered, slave windows alternate left and right in vertical stacks. The master is only centered when `slave_count_for_center_master` or more slaves are open; otherwise `center_master_fallback` applies.
+  </Tab>
+</Tabs>
+
+## Layout Messages
+
+Layout messages are sent via `hl.dsp.layout()`. Parameters for commands are separated by a single space.
+
+### Master Management
+
+| Command | Description | Params |
+| --- | --- | --- |
+| `addmaster` | Promotes the active window to master (or the first non-master if active is already master) | none |
+| `removemaster` | Demotes the active master to slave (or the last master window if active is not master) | none |
+| `swapwithmaster` | Swaps the focused window with the master. If focused is already master, swaps with the first child | `"master"` (focus new master), `"child"` (focus new child), `"auto"` (default, keep previous focus). Append `ignoremaster` to skip the dispatch when master is already focused |
+| `rollnext` | Rotates the next slave up to become master, keeping focus on master | none |
+| `rollprev` | Rotates the previous slave up to become master, keeping focus on master | none |
+| `focusmaster` | Focuses the master window | `"master"` (stay on master), `"auto"` (default; focus first non-master if already on master), `"previous"` (remember current window; if on master, focus previous or fall back to `auto`) |
+
+### Focus and Swap
+
+| Command | Description | Params |
+| --- | --- | --- |
+| `cyclenext` | Focuses the next window respecting the layout order | `"loop"` (default — wrap from bottom back to master) or `"noloop"` (stop at bottom, like DWM) |
+| `cycleprev` | Focuses the previous window respecting the layout order | `"loop"` (default — wrap from master to bottom) or `"noloop"` (stop at master, like DWM) |
+| `swapnext` | Swaps the focused window with the next window in layout order | `"loop"` (default — allow swapping bottom and master) or `"noloop"` |
+| `swapprev` | Swaps the focused window with the previous window in layout order | `"loop"` (default — allow swapping master and bottom) or `"noloop"` |
+
+### Split Ratio
+
+| Command | Description | Params |
+| --- | --- | --- |
+| `mfact` | Change the master split ratio | A new absolute ratio, or a relative delta such as `-0.2` / `+0.2`, or `exact` followed by a value between `0.0` and `1.0` |
+
+### Orientation
+
+| Command | Description | Params |
+| --- | --- | --- |
+| `orientationleft` | Set current workspace orientation to left | none |
+| `orientationright` | Set current workspace orientation to right | none |
+| `orientationtop` | Set current workspace orientation to top | none |
+| `orientationbottom` | Set current workspace orientation to bottom | none |
+| `orientationcenter` | Set current workspace orientation to center | none |
+| `orientationnext` | Cycle to the next orientation clockwise | none |
+| `orientationprev` | Cycle to the previous orientation counter-clockwise | none |
+| `orientationcycle` | Cycle through a custom list of orientations for the current workspace | Space-separated list of `left`, `right`, `top`, `bottom`, `center`. Behaves like `orientationnext` if left empty |
+
+### Example Key Bindings
+
+```lua
+-- Swap focused window with master, keeping focus on master
+hl.bind(KEYS, hl.dsp.layout("swapwithmaster master"))
+
+-- xmonad-style promote: focused slave becomes master
+hl.bind(KEYS, hl.dsp.layout("swapwithmaster auto"))
+
+-- Cycle through orientations
+hl.bind("SUPER + O", hl.dsp.layout("orientationcycle left top right bottom"))
+
+-- Adjust mfact relative
+hl.bind("SUPER + H", hl.dsp.layout("mfact -0.05"))
+hl.bind("SUPER + L", hl.dsp.layout("mfact +0.05"))
+
+-- Focus master
+hl.bind("SUPER + M", hl.dsp.layout("focusmaster auto"))
+```
+
+## Workspace Rules
+
+Use `layout_opts` in a workspace rule to set a per-workspace orientation that overrides the global `orientation` config option.
+
+| Rule | Description | Type |
+| --- | --- | --- |
+| `orientation` | Sets the orientation for a specific workspace | string |
+
+```lua
+-- Workspace 2 uses a top orientation (master at top, slaves below)
+hl.workspace_rule({ workspace = "2", layout_opts = { orientation = "top" } })
+```

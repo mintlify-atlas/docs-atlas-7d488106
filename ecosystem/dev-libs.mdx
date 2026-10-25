@@ -1,0 +1,169 @@
+---
+title: "Hypr* Developer Libraries and Toolkits"
+sidebarTitle: "Dev Libraries"
+description: "Reference guide to every developer-facing Hypr* library — rendering backends, graphics utilities, config parsing, Wayland protocol generation, and more."
+---
+
+The Hypr\* ecosystem ships a set of reusable C++ libraries that underpin Hyprland and its companion applications. Rather than duplicating low-level concerns in each project, these libraries centralise rendering backends, shared data types, configuration parsing, protocol binding generation, and GUI primitives into well-maintained packages. This page describes each library, what problem it solves, and where to find it.
+
+<Info>
+  All libraries listed here are open source, hosted under the [hyprwm GitHub organisation](https://github.com/hyprwm), and are used in production by Hyprland itself. Refer to each repository's `README` and `docs/` directory for API details and build instructions.
+</Info>
+
+<CardGroup cols={2}>
+  <Card title="aquamarine" icon="water" href="https://github.com/hyprwm/aquamarine">
+    **Lightweight Linux rendering backend library.**
+
+    aquamarine implements the low-level KMS, DRM, and related rendering backends used by Hyprland. It is **not** a Wayland compositor library and does not compete with wlroots or libweston — it only handles the hardware-side rendering plumbing that sits beneath a compositor.
+
+    **What it provides:**
+    - KMS/DRM backend abstraction for direct GPU rendering
+    - Headless and virtual backends for testing
+    - Clean C++ API consumed by Hyprland
+
+    **Configuration:**
+    Aquamarine is configured via `AQ_*` environment variables passed to the host application (Hyprland). See the [environment variables page](/configuring/environment-variables) for the full list.
+
+    **Where to find it:**
+    [github.com/hyprwm/aquamarine](https://github.com/hyprwm/aquamarine)
+  </Card>
+
+  <Card title="hyprgraphics" icon="shapes" href="https://github.com/hyprwm/hyprgraphics">
+    **Shared graphics and resource utilities.**
+
+    hyprgraphics provides common implementations of graphics-related operations that are needed across multiple Hypr\* projects. Instead of each project duplicating image loading, color math, and related helpers, they pull in hyprgraphics as a shared dependency.
+
+    **What it provides:**
+    - Image loading utilities (multiple format support)
+    - Color calculation helpers
+    - Shared graphics primitives reused by Hyprland and companion apps
+
+    **Where to find it:**
+    [github.com/hyprwm/hyprgraphics](https://github.com/hyprwm/hyprgraphics)
+
+    <Info>
+      hyprgraphics is a build dependency of Hyprland and several Hypr\* apps. If you are packaging a Hypr\* application, ensure hyprgraphics is available in the build environment.
+    </Info>
+  </Card>
+
+  <Card title="hyprlang" icon="code" href="https://github.com/hyprwm/hyprlang">
+    **Parser library for the Hypr configuration language.**
+
+    hyprlang implements the configuration language used by Hyprland, hyprlock, hypridle, and other Hypr\* tools. Embedding it in an application gives you a fully-featured config parser with variables, categories, conditionals, and arithmetic — without writing a parser from scratch.
+
+    **What it provides:**
+    - Line-style `KEY = VALUE` config parsing
+    - Regular and special (keyed) category blocks
+    - User-defined variables (`$VAR = value`) and variable substitution
+    - Arithmetic operations via `{{VAR1 + VAR2}}` syntax (since 0.6.3)
+    - Conditional blocks via `# hyprlang if` directives (since 0.6.4)
+    - Inline option shorthand (`category:variable = value`)
+    - Error suppression for plugin-provided keywords (`# hyprlang noerror`)
+
+    **Developer documentation:**
+    [standards.hyprland.org/hyprlang](https://standards.hyprland.org/hyprlang/)
+
+    ```ini
+    # Example hyprlang config snippet
+    $SCALE = 2
+    $SIZE  = {{SCALE * 10}}
+
+    general {
+        border_size = $SIZE
+    }
+    ```
+  </Card>
+
+  <Card title="hyprutils" icon="wrench" href="https://github.com/hyprwm/hyprutils">
+    **Shared utility types for the Hypr\* ecosystem.**
+
+    hyprutils provides the common C++ types and helpers that appear throughout every Hypr\* project — smart pointers, signals, math primitives, and other building blocks that would otherwise be copy-pasted across repositories.
+
+    **What it provides:**
+    - Smart pointer types used consistently across the ecosystem
+    - Signal/event primitives
+    - Math and geometry helpers
+    - Utility functions shared by Hyprland, aquamarine, hyprtoolkit, and others
+
+    **Where to find it:**
+    [github.com/hyprwm/hyprutils](https://github.com/hyprwm/hyprutils)
+
+    <Info>
+      hyprutils is a foundational dependency. When building any Hypr\* application from source, hyprutils must be installed or built first.
+    </Info>
+  </Card>
+
+  <Card title="hyprwayland-scanner" icon="terminal" href="https://github.com/hyprwm/hyprwayland-scanner">
+    **C++ Wayland protocol code generator.**
+
+    hyprwayland-scanner (also called `hw-s`) generates C++ source files and headers from Wayland XML protocol specifications. It fills the same role as the standard `wayland-scanner` tool, but targets C++ instead of C, producing safer and more idiomatic bindings.
+
+    **What it provides:**
+    - Safe, modern C++ implementations generated from `.xml` Wayland protocol files
+    - Drop-in alternative to `wayland-scanner` for C++ projects
+    - Used by Hyprland to generate its private protocol implementations
+
+    **Usage pattern:**
+    ```sh
+    hyprwayland-scanner --client protocol.xml ./generated/
+    hyprwayland-scanner --server protocol.xml ./generated/
+    ```
+
+    **Where to find it:**
+    [github.com/hyprwm/hyprwayland-scanner](https://github.com/hyprwm/hyprwayland-scanner)
+  </Card>
+
+  <Card title="hyprland-guiutils" icon="window" href="https://github.com/hyprwm/hyprland-guiutils">
+    **Shared GUI utility library for Hyprland tooling.**
+
+    hyprland-guiutils is the successor to hyprland-qtutils, providing shared graphical utilities consumed by Hyprland's companion tools. It bridges the gap between the compositor and the helper applications that need to display UI within a Hyprland session.
+
+    **What it provides:**
+    - Shared GUI components reused across Hypr\* applications
+    - Successor to hyprland-qtutils with an updated API
+    - Consumed internally by tools like the XDPH share picker
+
+    **Where to find it:**
+    [github.com/hyprwm/hyprland-guiutils](https://github.com/hyprwm/hyprland-guiutils)
+
+    <Info>
+      Most users will install hyprland-guiutils as an indirect dependency of xdg-desktop-portal-hyprland or other Hypr\* packages. Direct use is primarily for developers building Hyprland-integrated tools.
+    </Info>
+  </Card>
+
+  <Card title="hyprtoolkit (developer)" icon="layer-group" href="https://github.com/hyprwm/hyprtoolkit">
+    **Pure C++ GUI toolkit for Wayland applications.**
+
+    hyprtoolkit is a retained-mode widget toolkit written in modern C++ (with hyprutils, etc.) that runs natively on Wayland. It powers hyprlauncher, hyprshutdown, hyprpolkitagent, and other Hypr\* apps. It is designed for developers already comfortable with C++.
+
+    **What it provides:**
+    - `CBackend` and `CWindowBuilder` for application and window lifecycle
+    - Retained-mode element tree: `CRectangle`, `CButton`, `CColumnLayout`, `CRowLayout`, `CText`, `CImage`, and more
+    - Absolute and layout (flex-like) positioning modes
+    - `SizeType` variants: `ABSOLUTE`, `PERCENT`, `AUTO`
+    - Palette-aware color system for automatic theme adherence
+    - `CBackend::addFd()` for integrating external event loops (PipeWire, D-Bus, etc.)
+    - System icon factory via `CBackend::systemIcons()`
+
+    ```cpp
+    using namespace Hyprtoolkit;
+    auto backend = CBackend::create();
+    auto window  = CWindowBuilder::begin()
+                       ->appTitle("My App")
+                       ->appClass("myapp")
+                       ->commence();
+
+    window->m_rootElement->addChild(
+        CRectangleBuilder::begin()
+            ->color([] { return backend->getPalette()->m_colors.background; })
+            ->commence()
+    );
+    window->open();
+    backend->enterLoop();
+    ```
+
+    **Developer docs:** see `tests/` in the repo for working examples.
+
+    [github.com/hyprwm/hyprtoolkit](https://github.com/hyprwm/hyprtoolkit)
+  </Card>
+</CardGroup>

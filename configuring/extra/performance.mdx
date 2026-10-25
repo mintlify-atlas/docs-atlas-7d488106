@@ -1,0 +1,82 @@
+---
+title: "Hyprland Performance Tuning: FPS, Power, and Stutters"
+sidebarTitle: Performance
+description: Fix FPS drops, stutters, and high GPU usage in Hyprland by tuning fractional scaling, TLP settings, disabling effects, and using gamescope for games.
+---
+
+Hyprland is designed to be fast and responsive, but certain hardware configurations, driver versions, or workloads can introduce stutters, FPS drops, or unexpectedly high GPU usage. This page documents known tricks and configuration changes to address these issues — whether you are chasing maximum performance in games or trying to minimise power consumption on a laptop.
+
+## Fractional Scaling
+
+Wayland fractional scaling support has improved significantly, but not all applications handle it correctly. Some may trigger high GPU usage or cause Hyprland to feel laggy when a non-integer scale factor is active.
+
+If you notice high GPU usage or general sluggishness, try switching to an integer scale factor:
+
+```lua
+-- Use integer scale (1 = native, 2 = double)
+hl.monitor({ output = "", mode = "preferred", position = "auto", scale = 2 })
+```
+
+This avoids the additional compositing work required to handle fractional scale factors and eliminates related rendering artefacts in applications that do not support fractional scaling.
+
+## Low FPS / Stutter on Intel iGPU with TLP (Laptops)
+
+The default TLP power-management configuration is aggressive with Intel GPU frequency scaling. On many laptops this causes noticeable micro-stutters in Hyprland because the GPU frequency floor is set too low.
+
+<Tip>
+  Raise `INTEL_GPU_MIN_FREQ_ON_AC` and `INTEL_GPU_MIN_FREQ_ON_BAT` in `/etc/tlp.conf` to reduce stutter. For example, changing the minimum from 300 MHz to 500 MHz can significantly reduce or fully eliminate stutters.
+</Tip>
+
+Open `/etc/tlp.conf` and adjust the relevant values:
+
+```bash
+# /etc/tlp.conf
+INTEL_GPU_MIN_FREQ_ON_AC=500
+INTEL_GPU_MIN_FREQ_ON_BAT=500
+```
+
+Restart the TLP service after making changes:
+
+```bash
+sudo systemctl restart tlp
+```
+
+## Reducing Power Consumption on Laptops
+
+If battery life is a priority, the most impactful change is to disable blur and other GPU-intensive visual effects:
+
+```lua
+hl.config({
+  ["decoration.blur.enabled"] = false
+})
+```
+
+These effects look great but require the GPU to do substantially more compositing work on every frame. Disabling them can noticeably extend battery runtime.
+
+## Games: Poor Performance or Proton Issues
+
+Games running through Proton or other compatibility layers can experience rendering issues, frame-pacing problems, or crashes when running directly under Hyprland. The recommended solution is to use `gamescope`:
+
+```bash
+gamescope -- %command%
+```
+
+<Note>
+  `gamescope` is a micro-compositor purpose-built for games. It handles its own frame scheduling, VRR/adaptive sync, FSR upscaling, and HDR, and tends to resolve Wayland-specific game compatibility issues. Most Proton games work better when wrapped with gamescope.
+</Note>
+
+## Summary of Performance-Related Config Options
+
+<Accordion title="All performance-related config snippets">
+
+```lua
+-- Disable blur for lower GPU usage
+hl.config({
+  ["decoration.blur.enabled"] = false
+})
+
+-- Use integer scaling to avoid fractional scale overhead
+hl.monitor({ output = "", mode = "preferred", position = "auto", scale = 2 })
+```
+
+</Accordion>

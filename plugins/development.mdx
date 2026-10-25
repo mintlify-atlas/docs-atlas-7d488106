@@ -1,0 +1,338 @@
+---
+title: "Hyprland Plugin Development: From Zero to Production"
+sidebarTitle: Development
+description: "Build, hook, and publish Hyprland plugins in C++: project setup, the plugin API, function hooks, config values, and hyprpm packaging guidelines."
+---
+
+Hyprland plugins are dynamic shared objects loaded directly into the compositor process, giving them access to nearly every internal subsystem — rendering, window management, input, configuration, and more. This guide walks through everything you need to write a plugin from scratch, hook into Hyprland internals safely, and package your work for distribution via `hyprpm`.
+
+---
+
+## Getting Started
+
+### Prerequisites
+
+Before writing a plugin you will need:
+
+- Solid knowledge of **C++**
+- A rough understanding of Hyprland's internals (you can learn this alongside development)
+- The **Hyprland headers** (see below)
+
+<Steps>
+  <Step title="Create a project directory">
+    Create a new directory for your plugin. This guide uses `MyPlugin` as the example name.
+
+    ```sh
+    mkdir MyPlugin && cd MyPlugin
+    ```
+  </Step>
+
+  <Step title="Obtain Hyprland headers">
+    <Tabs>
+      <Tab title="Installed via make install">
+        If you installed Hyprland with `make install`, the headers are already available system-wide. No additional steps are needed.
+      </Tab>
+      <Tab title="Manual clone">
+        Clone the Hyprland source into a subdirectory, then build and install the headers:
+
+        ```sh
+        git clone https://github.com/hyprwm/Hyprland
+        cd Hyprland
+        make debug
+        sudo make installheaders
+        cd ..
+        ```
+      </Tab>
+    </Tabs>
+  </Step>
+
+  <Step title="Write the plugin entry point">
+    Create your main `.cpp` file. At minimum it must include the plugin API header, declare a global handle, and export the three required symbols described below.
+
+    ```cpp
+    #include <hyprland/src/plugins/PluginAPI.hpp>
+
+    // Global handle — set during PLUGIN_INIT and required for all API calls.
+    inline HANDLE PHANDLE = nullptr;
+    ```
+  </Step>
+
+  <Step title="Export PLUGIN_API_VERSION">
+    This symbol tells Hyprland which API version the plugin was compiled against. **Do not modify it.**
+
+    ```cpp
+    // Do NOT change this function.
+    APICALL EXPORT std::string PLUGIN_API_VERSION() {
+        return HYPRLAND_API_VERSION;
+    }
+    ```
+  </Step>
+
+  <Step title="Export PLUGIN_INIT">
+    `PLUGIN_INIT` is called when the plugin is loaded. Store the handle, verify header compatibility, register your config values and hooks, and return a `PLUGIN_DESCRIPTION_INFO` struct.
+
+    ```cpp
+    APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
+        PHANDLE = handle;
+
+        const std::string COMPOSITOR_HASH = __hyprland_api_get_hash();
+        const std::string CLIENT_HASH     = __hyprland_api_get_client_hash();
+
+        // Always include this check. It prevents crashes from mismatched headers.
+        if (COMPOSITOR_HASH != CLIENT_HASH) {
+            HyprlandAPI::addNotification(
+                PHANDLE,
+                "[MyPlugin] Mismatched headers! Can't proceed.",
+                CHyprColor{1.0, 0.2, 0.2, 1.0},
+                5000
+            );
+            throw std::runtime_error("[MyPlugin] Version mismatch");
+        }
+
+        // Register config values, hooks, dispatchers, etc. here.
+
+        return {"MyPlugin", "An amazing plugin that will change the world!", "Me", "1.0"};
+    }
+    ```
+
+    <Note>
+    Config variables may **only** be registered inside `PLUGIN_INIT`. Attempting to add them later will have no effect.
+    </Note>
+  </Step>
+
+  <Step title="Export PLUGIN_EXIT (optional)">
+    `PLUGIN_EXIT` is called when the user unloads the plugin cleanly. It is **not** called if the plugin is being unloaded due to a crash.
+
+    You do not need to manually unregister layouts, config options, dispatchers, window decorations, or hooks in this function — Hyprland handles cleanup automatically.
+
+    ```cpp
+    APICALL EXPORT void PLUGIN_EXIT() {
+        // Optional teardown logic.
+    }
+    ```
+  </Step>
+
+  <Step title="Set up a development environment">
+    Work inside a **nested Hyprland session** so that a plugin crash does not affect your real desktop. Build your plugin, then load it into the nest:
+
+    ```sh
+    hyprctl plugin load /absolute/path/to/plugin.so
+    ```
+
+    The typical development loop is: edit → build → unload → load:
+
+    ```sh
+    hyprctl plugin unload /absolute/path/to/plugin.so ; \
+    hyprctl plugin load  /absolute/path/to/plugin.so
+    ```
+  </Step>
+</Steps>
+
+---
+
+## Plugin API Overview
+
+The full API surface is documented in `src/plugins/PluginAPI.hpp` inside the Hyprland source tree — every method has inline comments. The sections below cover the most commonly used areas.
+
+### Accessing Private Members
+
+If you need access to a private member of a Hyprland class, bracket your includes with a visibility macro. Be aware that some Hyprland headers pull in STL headers; if you encounter compiler errors, include the problematic STL header **before** this block.
+
+```cpp
+#define private public
+#include <hyprland/src/plugins/PluginAPI.hpp>
+#include <hyprland/src/render/OpenGL.hpp>
+#include <hyprland/src/desktop/Window.hpp>
+#include <hyprland/src/layout/IHyprLayout.hpp>
+#undef private
+```
+
+### Function Hooks
+
+Function hooks let your plugin intercept any call to a named Hyprland function — before it executes, after, or instead of it entirely.
+
+<Warning>
+Function hooks are only available on **AMD64 (x86\_64)**. On any other architecture, `createFunctionHook` silently does nothing.
+</Warning>
+
+#### Hooking a Free Function
+
+```cpp
+// Global hook instance and typedef for the original signature.
+inline CFunctionHook* g_pMonitorFrameHook = nullptr;
+typedef void (*origMonitorFrame)(void*, void*);
+
+// Replacement function.
+void hkMonitorFrame(void* owner, void* data) {
+    // Run code before the original...
+    (*(origMonitorFrame)g_pMonitorFrameHook->m_pOriginal)(owner, data);
+    // ...or after.
+}
+
+APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
+    // ...
+
+    // Look up the function and create the hook.
+    static const auto METHODS =
+        HyprlandAPI::findFunctionsByName(PHANDLE, "listener_monitorFrame");
+    g_pMonitorFrameHook =
+        HyprlandAPI::createFunctionHook(handle, METHODS[0].address, (void*)&hkMonitorFrame);
+    g_pMonitorFrameHook->hook();
+
+    // ...
+}
+```
+
+#### Hooking a Member Function
+
+Member function hooks require an extra `void* thisptr` as the first argument:
+
+```cpp
+typedef void (*origFocusWindow)(void*, CWindow*, wlr_surface*);
+
+void hkFocusWindow(void* thisptr, CWindow* pWindow, wlr_surface* pSurface) {
+    // Custom logic...
+    (*(origFocusWindow)g_pFocusWindowHook->m_pOriginal)(thisptr, pWindow, pSurface);
+}
+
+APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
+    // ...
+    static const auto METHODS =
+        HyprlandAPI::findFunctionsByName(PHANDLE, "focusWindow");
+    g_pFocusWindowHook =
+        HyprlandAPI::createFunctionHook(handle, METHODS[0].address, (void*)&hkFocusWindow);
+    g_pFocusWindowHook->hook();
+    // ...
+}
+```
+
+Hooks can be toggled at any time:
+
+```cpp
+g_pFocusWindowHook->unhook(); // Temporarily disable
+g_pFocusWindowHook->hook();   // Re-enable
+```
+
+<Note>
+Function lookups via `findFunctionsByName` are **slow**. Because the results never change at runtime, always mark the result `static` so the search runs only once.
+</Note>
+
+#### Why `findFunctionsByName` Instead of a Direct Address?
+
+1. **Resilience** — a direct function pointer becomes invalid if the Hyprland binary is updated; `findFunctionsByName` searches by name and remains valid as long as the function exists.
+2. **Error handling** — the returned array includes signatures you can verify, making it easy to confirm you found the right overload or throw a descriptive error if it's missing.
+
+### Config Values
+
+Register config variables in `PLUGIN_INIT`. All plugin variables **must** live under the `plugins:` top-level category:
+
+```cpp
+HyprlandAPI::addConfigValue(PHANDLE, "plugin:myPlugin:exampleInt", SConfigValue{.intValue = 1});
+```
+
+To read the value efficiently at runtime, cache the pointer as a `static`:
+
+```cpp
+static auto* const MYVAR =
+    &HyprlandAPI::getConfigValue(PHANDLE, "plugin:myPlugin:exampleInt")->intValue;
+```
+
+<Tip>
+Group all your plugin's variables under a subcategory named after your plugin (e.g., `plugin:myPlugin:variable1`). This keeps the config namespace tidy and avoids collisions with other plugins.
+</Tip>
+
+---
+
+## hyprpm Packaging
+
+To make your plugin installable by `hyprpm`, create a `hyprpm.toml` file in the root of your repository.
+
+### Repository Metadata
+
+```toml
+[repository]
+name    = "MyPlugin"
+authors = ["Me"]
+commit_pins = [
+    ["3bb9c7c5cf4f2ee30bf821501499f2308d616f94", "efee74a7404495dbda70205824d6e9fc923ccdae"],
+    ["d74607e414dcd16911089a6d4b6aeb661c880923", "efee74a7404495dbda70205824d6e9fc923ccdae"]
+]
+```
+
+`name` and `authors` are required. `commit_pins` is optional — see [Commit Pins](#commit-pins) below.
+
+### Plugin Entry
+
+For each plugin exposed by the repo, add a section:
+
+```toml
+[plugin-name]
+description = "An epic plugin that will change the world!"
+authors     = ["Me"]
+output      = "plugin.so"
+build       = [
+    "make all"
+]
+```
+
+`output` and `build` are required. `description` and `authors` are optional. Each command in `build` runs with the working directory reset to the repo root.
+
+### Commit Pins
+
+Commit pins let you tie specific plugin commits to specific Hyprland releases. Each pin is a pair of `[hyprland-commit-hash, plugin-commit-hash]`:
+
+```toml
+commit_pins = [
+    ["d74607e414dcd16911089a6d4b6aeb661c880923", "efee74a7404495dbda70205824d6e9fc923ccdae"]
+]
+```
+
+If a user is running the Hyprland version that matches the first hash, `hyprpm` will check out your plugin at the second hash. If no pin matches, the latest git commit is used.
+
+<Tip>
+Add a new commit pin for every Hyprland release to give your users predictable, tested versions.
+</Tip>
+
+---
+
+## Plugin Guidelines
+
+Following these guidelines helps ensure your plugin is stable, maintainable, and compatible across Hyprland updates.
+
+<CardGroup cols={2}>
+  <Card title="Prefer the Plugin API" icon="shield-check">
+    Always use `HyprlandAPI::` functions when they cover your use case. API methods are guaranteed stable across minor versions. Reaching into internal headers directly is fine when necessary, but those interfaces can change without notice.
+  </Card>
+  <Card title="Prefer Event Hooks over Function Hooks" icon="bolt">
+    Event hooks are higher-level and far less likely to break between updates. Treat function hooks as a last resort, used only when no event covers your needs.
+  </Card>
+  <Card title="Stay Single-Threaded" icon="arrow-right-arrow-left">
+    The Wayland event loop is strictly single-threaded. Do not spawn threads that interact with Hyprland's internals. Fully detached threads (e.g., writing a file) are acceptable.
+  </Card>
+  <Card title="Follow Hyprland Code Style" icon="code">
+    While not mandatory, matching Hyprland's formatting and naming conventions makes collaborative debugging easier. Refer to `.clang-format` in the Hyprland repository.
+  </Card>
+</CardGroup>
+
+<Warning>
+Never assume that internal Hyprland functions (outside the public API) will remain unchanged. Even seemingly fundamental functions like `focusWindow` or `mouseMoveUnified` may have their signatures or behavior altered in any release.
+</Warning>
+
+---
+
+## Further Reading
+
+<CardGroup cols={2}>
+  <Card title="PluginAPI.hpp" icon="file-code" href="https://github.com/hyprwm/Hyprland/blob/main/src/plugins/PluginAPI.hpp">
+    The canonical reference for every API method, with inline documentation on each one.
+  </Card>
+  <Card title="Official Plugin Examples" icon="github" href="https://github.com/hyprwm/hyprland-plugins">
+    The `csgo-vulkan-fix` and `hyprwinwrap` plugins are good minimal examples to read alongside this guide.
+  </Card>
+  <Card title="Using Plugins" icon="puzzle-piece" href="/plugins/using-plugins">
+    Instructions for end users to install and manage plugins with `hyprpm`.
+  </Card>
+  <Card title="Contributing & Debugging" icon="wrench" href="/contributing/overview">
+    How to set up a nested Hyprland development environment for safe plugin testing.
+  </Card>
+</CardGroup>

@@ -1,0 +1,328 @@
+---
+title: "Hyprland Frequently Asked Questions and Common Fixes"
+sidebarTitle: "FAQ"
+description: "Answers to the most common Hyprland questions: symbol errors, XWayland scaling, blank monitors, screen sharing, cursor themes, and more."
+---
+
+If something in your Hyprland setup is not behaving as expected, this page covers the most frequently encountered questions and their solutions. Read it thoroughly before filing a bug report or opening a discussion — most issues have a straightforward answer here.
+
+## Library & Build Issues
+
+<Accordion title="Symbol lookup error or missing .so file on launch">
+If you see an error such as:
+
+```text
+<app>: symbol lookup error: <app>: undefined symbol: <symbol>
+```
+
+or:
+
+```text
+<app>: error while loading shared libraries: <lib>: cannot open shared object file: No such file or directory
+```
+
+…or your app crashes at launch or randomly without a clear error, you most likely built Hyprland yourself and your library stack has become mismatched. Each `hypr*` application depends on a set of shared libraries. When those libraries are updated without rebuilding the entire `hypr*` stack, you will encounter these errors or silent crashes.
+
+If you want to avoid these problems altogether, **use packages and do not build yourself**. When building yourself, you are responsible for keeping every component consistent.
+
+When building yourself, you must rebuild **all** `hypr*` components together — you cannot mix some from packages with some from source.
+
+**For Arch users:** `-git` packages count as building yourself.
+
+Read the correct [build order in the Installation guide](/getting-started/installation#manual-build).
+</Accordion>
+
+<Accordion title="I get a .so file missing error on launch">
+If you are using a `-git` package, this is a common occurrence after ABI-breaking updates.
+
+<Warning>
+  Do **not** symlink different `.so` versions. This will cause crashes.
+</Warning>
+
+Instead, find all `hypr*` packages with `-git` you have installed, remove them (and their dependencies if needed), then simply install them again from scratch.
+
+- If using **yay**: make sure to choose `CleanBuild` for every package.
+- If using **paru**: manually remove the `hypr*` package caches from `~/.cache/paru` before reinstalling.
+
+If you are not using any `-git` packages, the mismatch is a packaging error in your distribution and should be reported there.
+</Accordion>
+
+## Display & Rendering
+
+<Accordion title="My apps look pixelated or blurry">
+Pixelated apps are running through **XWayland**, which cannot scale by fractional amounts. This is a fundamental limitation of the XWayland compatibility layer, not a Hyprland bug.
+
+To force affected apps to run in native Wayland mode, see the [Master Tutorial — Force Apps to Use Wayland](/getting-started/master-tutorial#force-apps-to-use-wayland).
+
+If a particular app cannot run natively in Wayland, consult the [XWayland page](/configuring/extra/xwayland) for workarounds.
+</Accordion>
+
+<Accordion title="My external monitor is blank or receives no signal (laptop)">
+**NVIDIA graphics:** This issue is generally resolved with NVIDIA driver version 525.60.11 or later. Older drivers may still exhibit it.
+
+**Systems with limited hardware (iGPU, USB-C, USB hubs):** Set the environment variable `AQ_NO_MODIFIERS` to `1` in your config. To confirm this is the exact problem, obtain a [DRM log](/crashes-and-bugs#debugging-drm-issues) and look for the following line:
+
+```plain
+Requested display configuration exceeds system DDB limitations
+```
+
+Beyond those, there are two workarounds that **might** work for your hardware:
+
+1. **Use only the external monitor.** Set `AQ_DRM_DEVICES=/dev/dri/card1` (or `card0`) to force Hyprland to use only your dGPU. Your laptop's built-in screen will be unavailable, but the external monitor will work.
+2. **Switch to dGPU-only mode in BIOS.** This may allow all outputs to work simultaneously, at the cost of higher battery usage.
+
+<Note>
+  These fixes are highly model-specific and may not apply to every machine. You might also try a USB-C to HDMI adapter, which may route the signal through the iGPU instead.
+</Note>
+</Accordion>
+
+<Accordion title="My monitor won't work or has the wrong mode">
+Try changing the monitor mode in your config. If your preferred resolution or refresh rate does not work, try a lower one. To see all modes reported by your monitor, run:
+
+```bash
+hyprctl monitors
+```
+</Accordion>
+
+<Accordion title="My monitor has flickering brightness when VRR is on">
+Change the VRR option to `2` (fullscreen only) so that variable refresh rate is only active during games. The flickering happens because some monitors tie brightness to refresh rate; rapidly switching refresh rates (even from a brief keypress) causes visible brightness changes.
+
+If you want VRR always enabled and wish to mitigate the flickering, you can modify the VRR range in your monitor's EDID. The [Arch Wiki page on forcing modes and EDID](https://wiki.archlinux.org/title/Kernel_mode_setting#Forcing_modes_and_EDID) has detailed instructions.
+</Accordion>
+
+<Accordion title="Fullscreen apps or Steam games open at the wrong resolution">
+The likely cause is that X11's default primary monitor is not your intended primary display. Add the following line to your Hyprland autostart config, replacing `[MONITOR_ID]` with your main monitor's ID (find it with `hyprctl monitors`):
+
+```bash
+xrandr --output [MONITOR_ID] --primary
+```
+
+This instructs X11 applications to treat the specified monitor as the default.
+</Accordion>
+
+## Screen Sharing & Portals
+
+<Accordion title="Screen sharing or OBS doesn't work">
+Check the [Screen Sharing utility page](/useful-utilities) for setup instructions.
+
+To use OBS, you must also have `qt6-wayland` installed.
+</Accordion>
+
+<Accordion title="Apps take a long time to start or can't screenshare">
+You most likely have multiple portal implementations installed, or one is failing to launch. See the [xdg-desktop-portal-hyprland debugging page](/ecosystem/user-apps) for details.
+
+If portals are launching before the environment variables are exported, use the following autostart approach in your `hyprland.lua`:
+
+```lua {filename="~/.config/hypr/hyprland.lua"}
+hl.on("hyprland.start", function()
+  hl.exec_cmd("dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP")
+end)
+```
+
+Make sure portals launch **after** this executes. If they still launch too early, a restart script with delays can help:
+
+```bash
+#!/usr/bin/env bash
+sleep 4
+killall -e xdg-desktop-portal-hyprland
+killall xdg-desktop-portal
+/usr/lib/xdg-desktop-portal-hyprland &
+sleep 4
+/usr/lib/xdg-desktop-portal &
+```
+
+Adjust the `sleep` durations to suit your system's startup speed.
+</Accordion>
+
+<Accordion title="My screenshot utility won't work with multiple screens">
+Some programs such as Flameshot have limited or incomplete Wayland support. Consider switching to a screenshot tool designed natively for Wayland. See [Screenshots and Recording](/useful-utilities) for recommendations.
+</Accordion>
+
+## Cursor & Themes
+
+<Accordion title="My cursor shows a Hyprland icon instead of a theme">
+This means no `hyprcursor` theme is installed and Hyprland also failed to find a fallback XCursor theme. Install a cursor theme to resolve it.
+
+See [hyprcursor](/ecosystem/user-apps) for the recommended approach.
+</Accordion>
+
+<Accordion title="How do I change my mouse cursor?">
+See the [hyprcursor page](/ecosystem/user-apps) for the primary method. Additionally:
+
+1. Set the GTK cursor using [nwg-look](https://github.com/nwg-piotr/nwg-look).
+2. Add `hyprctl setcursor [THEME] [SIZE]` to your autoexecs in your Hyprland config and restart.
+
+If you use Flatpak apps, run:
+
+```bash
+flatpak override --filesystem=~/.themes:ro --filesystem=~/.icons:ro --user
+```
+
+Place themes in both `/usr/share/themes` and `~/.themes`, and icons/cursors in both `/usr/share/icons` and `~/.icons`.
+
+For Qt applications, Hyprland exports `XCURSOR_SIZE` as `24` by default. Override it with the `env` directive if needed.
+
+You can also run `gsettings set org.gnome.desktop.interface cursor-theme 'theme-name'` or add it after your autoexecs. Without a GTK settings editor, edit `~/.config/gtk-4.0/settings.ini` and `~/.gtkrc-2.0` directly per the [XDG cursor specification](https://wiki.archlinux.org/title/Cursor_themes#Configuration).
+</Accordion>
+
+<Accordion title="GTK settings have no effect">
+Follow the [Sway wiki guide on GTK 3 settings on Wayland](https://github.com/swaywm/sway/wiki/GTK-3-settings-on-Wayland), which applies equally to Hyprland.
+</Accordion>
+
+## Keybinds & Input
+
+<Accordion title="I cannot bind SUPER as my modifier key on my laptop">
+Many laptops have a built-in toggle that switches `SUPER` between single-press and hold mode (often indicated by a padlock symbol on the key).
+
+First, install and run `wev`, then press and hold `SUPER`. If you see a key-press event followed by an immediate key-release event, your key is in single-press mode.
+
+On most laptops, pressing `FN+SUPER` toggles this. Verify in `wev` that you can now hold `SUPER` without seeing an immediate release. If `FN+SUPER` does not work, consult your laptop's manual.
+</Accordion>
+
+<Accordion title="My VM doesn't receive keybinds I have set in Hyprland">
+This is expected — Hyprland takes precedence over keybinds. Create a passthrough submap that forwards input to the VM:
+
+```lua
+hl.define_submap("passthru", function()
+  hl.bind("SUPER + Escape", hl.dsp.submap("reset"))
+end)
+hl.bind("...", hl.dsp.submap("passthru"))
+```
+
+Press the chosen combo to enter passthrough mode (Hyprland ignores your binds and passes them to the VM). Press `SUPER + Escape` to exit.
+</Accordion>
+
+<Accordion title="I can't create Discord keybinds">
+You most likely have `ELECTRON_OZONE_PLATFORM_HINT = wayland` set in your environment. Try launching Discord without it:
+
+```bash
+ELECTRON_OZONE_PLATFORM_HINT= discord
+```
+
+<Warning>
+  Running Discord this way places it under XWayland.
+</Warning>
+
+If that resolves the issue, navigate to the Discord desktop entry (usually at `/usr/share/applications/`), duplicate it, and replace the `Exec` line with:
+
+```text
+Exec=env -u ELECTRON_OZONE_PLATFORM_HINT /usr/bin/discord
+```
+
+You can also rename the duplicate (e.g., `Name=DiscordX`) to avoid confusion.
+</Accordion>
+
+<Accordion title="My mouse cursor keeps escaping the game window">
+While most games lock the cursor themselves, you can enforce cursor confinement from Hyprland's side using the `confine_pointer` window rule. To apply this to all fullscreen apps with a content type of `game`:
+
+```lua
+hl.window_rule({ match = { content = "game", fullscreen = true }, confine_pointer = true })
+```
+</Accordion>
+
+## Autostart & Environment
+
+<Accordion title="How do I autostart my favourite apps?">
+Use window rules to assign apps to workspaces, then open them silently at startup using the `hyprland.start` event. The following example starts several apps without the workspace-flicker effect:
+
+```lua {filename="~/.config/hypr/hyprland.lua"}
+hl.on("hyprland.start", function()
+  hl.exec_cmd("kitty")
+  hl.exec_cmd("dolphin")
+  hl.exec_cmd("dunst")
+  hl.exec_cmd("amongus", { workspace = "1 silent" })
+end)
+```
+</Accordion>
+
+<Accordion title="How do I move workspaces to a new monitor when I plug it in?">
+Listen to the `monitor.added` event and move your workspaces there. You can use `hl.on("monitor.added", ...)` in your `hyprland.lua` to respond to monitor hotplug events.
+</Accordion>
+
+<Accordion title="How do I export environment variables for Hyprland?">
+Use the `hl.env()` function in your config. For example:
+
+```lua
+hl.env("XDG_CURRENT_DESKTOP", "Hyprland")
+```
+
+See [Environment Variables](/configuring/environment-variables) for a full reference.
+</Accordion>
+
+<Accordion title="How do I disable middle-click paste?">
+Set `misc.middle_click_paste` to `false` in your config. Note that some browsers (notably Firefox) have their own built-in middle-click paste that must be disabled separately in the browser's settings.
+</Accordion>
+
+## Updating & Miscellaneous
+
+<Accordion title="How do I update Hyprland when building from source?">
+Open a terminal in the directory where you cloned the repository and run:
+
+```bash
+git pull
+make all && sudo make install
+```
+
+If you are using the AUR `hyprland-git` package, you need to do a clean build to update. Use **yay** instead of paru — paru has had issues with updating AUR packages reliably.
+</Accordion>
+
+<Accordion title="Will the rest of the Hypr* ecosystem switch to Lua from hyprlang?">
+Hyprland itself will continue using Lua. There are no plans to switch other `Hypr*` projects away from hyprlang.
+</Accordion>
+
+<Accordion title="How heavy is Hyprland on system resources?">
+Not significantly heavier than Xorg. For maximum performance, consider disabling blur and animations.
+</Accordion>
+
+<Accordion title="How do I take a screenshot?">
+Choose a utility from [Screenshots and Recording](/useful-utilities) and configure it according to that page's instructions.
+</Accordion>
+
+<Accordion title="How do I set my wallpaper?">
+See the [Wallpapers](/useful-utilities) page for compatible wallpaper tools.
+</Accordion>
+
+<Accordion title="How do I lock my screen?">
+Use a Wayland-compatible locking utility that implements WLR protocols, such as `swaylock`. Be aware that screen lockers do not prevent switching TTYs with `Ctrl-Alt-F1` through `F7`.
+</Accordion>
+
+<Accordion title="Waybar workspaces aren't working">
+Waybar has specific configuration requirements for Hyprland. See the [Status Bars](/useful-utilities) page for the relevant settings and caveats.
+</Accordion>
+
+<Accordion title="A program keeps freezing">
+Make sure you have a notification daemon running, such as `dunst`. Autostart it in your Hyprland config if D-Bus autostart is unreliable on your system.
+</Accordion>
+
+<Accordion title="My tablet isn't working">
+Use [Open Tablet Driver](https://github.com/OpenTabletDriver/OpenTabletDriver) to configure your tablet. Native tablet configuration within the Hyprland config is planned but not yet available; OTD is the recommended solution in the meantime.
+</Accordion>
+
+<Accordion title="Steam's file picker doesn't appear when adding a library drive">
+Steam ships its own non-functional file picker. Install `xdg-desktop-portal-gtk` to make the system file picker appear when Steam requests a directory selection.
+</Accordion>
+
+<Accordion title="Want smart gaps?">
+See the [Smart Gaps code snippet](/configuring/config-options) for a ready-to-use implementation.
+</Accordion>
+
+<Accordion title="Is the animation parameter 'damping' or 'dampening'?">
+It is `damping`. Not `dampening`. See [Wikipedia on Damping](https://en.wikipedia.org/wiki/Damping).
+</Accordion>
+
+## Still Need Help?
+
+<CardGroup cols={2}>
+  <Card title="Crashes & Bugs" icon="bug" href="/crashes-and-bugs">
+    Collect logs, crash reports, and stacktraces to diagnose harder problems.
+  </Card>
+  <Card title="Contributing" icon="code" href="/contributing/overview">
+    Set up a development environment and submit fixes back to the project.
+  </Card>
+  <Card title="Discord Community" icon="discord" href="https://discord.gg/hQ9XvMUjjr">
+    Ask for help in the official Hyprland Discord server.
+  </Card>
+  <Card title="GitHub Discussions" icon="github" href="https://github.com/hyprwm/Hyprland/discussions">
+    Open a discussion for bugs or features not yet listed in the FAQ.
+  </Card>
+</CardGroup>

@@ -1,0 +1,152 @@
+---
+title: "Hyprland Pull Request Guidelines and Code Style Rules"
+sidebarTitle: "PR Guidelines"
+description: "Code style rules, naming conventions, PR requirements, testing expectations, and the AI usage policy for contributing code to Hyprland."
+---
+
+Pull requests to Hyprland are reviewed carefully for code quality, style consistency, and correctness. Reading this page before submitting saves both you and the maintainers significant time by reducing back-and-forth style feedback. These guidelines apply to all code contributions across the `hyprwm` organisation unless stated otherwise.
+
+## PR Requirements
+
+Every pull request must satisfy all three of the following:
+
+- **Clean, non-hacky code.** Shortcuts and workarounds that introduce technical debt will be rejected.
+- **A clear description of the changes and the reasoning behind them.** Explain *what* changed and *why*.
+- **Adherence to the code style described on this page.**
+
+## AI Policy
+
+Following the [Hyprland AI Usage Policy](https://github.com/hyprwm/.github/blob/main/policies/AI_USAGE.md) is **mandatory**.
+
+<Warning>
+  Failure to comply with the AI policy may result in a permanent ban from opening pull requests in the hyprwm organisation.
+</Warning>
+
+## Code Style
+
+### Formatting with clang-format
+
+Formatting is **non-negotiable**. Your code must be formatted before submission. Run the following from the repository root to format only your changed lines:
+
+```sh
+git-clang-format
+```
+
+Or format the entire codebase at once:
+
+```sh
+make format-fix
+```
+
+### clang-tidy
+
+clang-tidy violations are not hard blockers, but you should minimise them and only suppress a check if it is absolutely necessary. The configuration is tuned so that in 99% of cases the violation should be fixed, not suppressed.
+
+### Additional style rules
+
+Some conventions that neither clang-format nor clang-tidy will catch:
+
+- **No uninitialised primitives.** Always initialise `int`, `float`, `double`, `size_t`, and similar types.
+- **No single-statement short-if braces.** If an `if`/`else` body is exactly one *line* (not one statement), omit the `{}`. This rule does **not** apply to loops.
+- **Empty function bodies.** Consider adding a `;` inside empty function bodies.
+- **Trailing commas in initialisers.** When initialising vectors, arrays, or maps with many elements, add a trailing `,` after the last element for cleaner diffs.
+- **Forward declarations in headers.** Prefer forward declarations over `#include` in headers when possible — this improves compile times.
+- **No `using namespace std;`** anywhere. `using namespace <anything>` is only permitted in source files, never in headers.
+- **Prefer guards over nesting.** `if (!valid) return;` is clearer than `if (valid) { /* a hundred things */ }`.
+
+### Naming conventions
+
+The codebase uses `camelCase` throughout. Additional prefixes apply in specific contexts:
+
+| Context | Convention | Example |
+|---|---|---|
+| Member variable of a class | `m_` prefix | `m_someValue` |
+| Class name | `C` prefix | `CMyClass` |
+| Struct name | `S` prefix | `SMyStruct` |
+| Interface name | `I` prefix | `IMyInterface` |
+| Global singleton pointer | `g_` prefix | `g_someManager` |
+| Constant variable | `ALL_CAPS` | `const auto MYVARIABLE = ...` |
+
+## General Code Requirements
+
+### No raw pointers
+
+Do not use raw pointers (e.g., `CMyClass*`) unless absolutely necessary. Use `UP`, `SP`, and `WP` — Hyprland's unique, shared, and weak pointer types respectively.
+
+### No malloc
+
+Avoid `malloc` and `free`. Manual memory management is error-prone and there is no justification for it in modern C++.
+
+### Wrap C-style allocators safely
+
+If you must call a C-style allocator (e.g., `some_c_call_make_new()`), ensure the paired free call always runs by either:
+
+- Wrapping the resource in a C++ class, or
+- Using a `CScopeGuard` to guarantee cleanup when the enclosing function exits.
+
+### Use the STL
+
+Prefer standard library containers and algorithms over custom re-implementations.
+
+### Use hyprutils
+
+[hyprutils](https://github.com/hyprwm/hyprutils) provides utilities specifically designed for Hyprland and other `hypr*` projects. Use them where applicable.
+
+### No absolute includes from `/src`
+
+When including a header from a sibling directory, always use a relative path:
+
+```text
+src/
+   a/
+      a.hpp
+   b/
+      b.hpp
+```
+
+From `a.hpp`, include `b.hpp` as `../b/b.hpp` — **not** `b/b.hpp`. The latter breaks plugins. The one exception is absolute paths from the project root (e.g., `protocols/some-protocol.hpp`), which are permitted.
+
+## Testing
+
+<Note>
+  See the [Contributing Overview](/contributing/overview) for full instructions on building and running tests.
+</Note>
+
+Hyprland has two test mechanisms:
+
+- **GTests (GoogleTest unit tests):** Run automatically by ctest. These test individual components in isolation.
+- **hyprtester:** Hyprland's own integration tester — runs a real Hyprland session and issues commands, checking results.
+
+**No test regressions** is a hard requirement. New tests are **required** for any change that can be tested (graphical effects are an acknowledged exception).
+
+To run the full GTest suite:
+
+```sh
+ctest -j$(nproc) -C Debug --test-dir=build
+```
+
+To run the hyprtester suite:
+
+```sh
+make test
+```
+
+To run only specific hyprtester tests:
+
+```sh
+make TESTS="dwindleSplit focusMasterPrevious processSpawning" test
+```
+
+## Review Process
+
+Hyprland maintainers are volunteers. Reviews may take time. To help the process go smoothly:
+
+- Ensure your PR passes all automated checks before requesting review.
+- Respond to review comments promptly and keep the PR up to date with `main`.
+- Do not ping maintainers repeatedly about review status — if the PR is ready, it will be reviewed in due course.
+
+Maintainers active in reviews include `@vaxerski`, `@fufexan`, and `@notashelf`.
+
+<Tip>
+  If you want early feedback before polishing your PR, open it as a **Draft** pull request. Maintainers can give directional feedback without the PR being considered ready for merge.
+</Tip>

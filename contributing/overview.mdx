@@ -1,0 +1,159 @@
+---
+title: "Contributing to Hyprland: Setup and Dev Environment"
+sidebarTitle: "Overview"
+description: "Everything you need to start contributing to Hyprland: vouching, debug builds, nested sessions, GDB, LSP configuration, and live log inspection."
+---
+
+Contributing to Hyprland involves a few prerequisites beyond just writing code. You need to be vouched before your pull request will be reviewed, you should build in debug mode for development, and you will want a proper local environment with a nested Hyprland session so that crashes don't disrupt your working desktop. This page covers all of that from start to finish.
+
+## Getting Vouched
+
+Before submitting a pull request, you must be vouched. Unvouched PRs are closed automatically.
+
+To request a vouch, open a request in the [hyprwm/.github discussions](https://github.com/hyprwm/.github/discussions).
+
+### Exemptions
+
+Pull requests made for **i18n (localisation) purposes** are exempt from the vouch requirement. When creating such a PR, read the comment at the top of the PR body template — it contains specific instructions for localisation submissions.
+
+## Building in Debug Mode
+
+<Steps>
+  <Step title="Install required dependencies">
+    See the [manual build section of the Installation guide](/getting-started/installation#manual-build) for the full list of build dependencies.
+  </Step>
+
+  <Step title="Clone the repository with submodules">
+    Submodules are required and must be included at clone time:
+
+    ```sh
+    git clone --recurse-submodules https://github.com/hyprwm/Hyprland.git
+    cd Hyprland
+    ```
+  </Step>
+
+  <Step title="Build in debug mode">
+    **Generic / command line:**
+
+    ```sh
+    make debug
+    ```
+
+    **VSCode:**
+
+    Install the C/C++ and CMake Tools extensions. The Hyprland repository includes a [launch.json](https://github.com/hyprwm/Hyprland/blob/main/example/launch.json) file — copy it to `.vscode/` in the repository root. Then open the debugging tab and select `(gdb) Launch`.
+
+    **Nix:**
+
+    See the [Nix overview page](/nix/overview) for Nix-specific debug workflows.
+  </Step>
+</Steps>
+
+## Setting Up the Development Environment
+
+<Steps>
+  <Step title="Create a debug config file">
+    Make a copy of your existing config:
+
+    ```sh
+    cp ~/.config/hypr/hyprland.lua ~/.config/hypr/hyprlandd.lua
+    ```
+
+    Debug builds automatically load `hyprlandd.lua` from the default config search path. You can also pass `--config ~/path/to/conf.lua` to override the location.
+  </Step>
+
+  <Step title="Prepare the debug config for development">
+    Edit `hyprlandd.lua` with the following recommended changes:
+
+    - **Remove all autoexec directives.** You do not want apps spawning in your test session unintentionally.
+    - **Change your default modifier key.** For example, swap `SUPER` for `ALT` so that your test session's binds don't conflict with your outer session.
+  </Step>
+
+  <Step title="Launch a nested Hyprland session">
+    While logged into your normal Hyprland session, run the debug binary:
+
+    ```sh
+    ./build/Hyprland
+    ```
+
+    A new window will open with Hyprland running inside it. You can test changes in this nested session without risking your main desktop. If the inner session crashes, your outer session is unaffected.
+  </Step>
+
+  <Step title="Attach a debugger">
+    Launch with GDB for interactive crash inspection:
+
+    ```sh
+    gdb ./build/Hyprland
+    ```
+
+    When Hyprland crashes, GDB will pause execution and let you inspect the current state with commands like `bt`, `frame`, and `print`. If you use an IDE such as VSCode, the graphical debugger provides the same capability.
+  </Step>
+</Steps>
+
+## LSP and Code Formatting Setup
+
+<Steps>
+  <Step title="Generate compile commands for clangd">
+    If your editor does not set this up automatically, generate compile commands so that clangd can provide full LSP support (code completion, go-to-definition, diagnostics):
+
+    ```sh
+    cmake -S . -B build/ -G Ninja -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+    ```
+
+    Point your editor's clangd configuration at the resulting `build/compile_commands.json`.
+  </Step>
+
+  <Step title="Format your changes before submitting">
+    All code must be formatted with clang-format before a PR is opened. To format only your changed lines (rather than the entire codebase), run:
+
+    ```sh
+    git-clang-format
+    ```
+
+    Alternatively, format everything at once using the Makefile target:
+
+    ```sh
+    make format-fix
+    ```
+  </Step>
+</Steps>
+
+## Working with Logs and Coredumps
+
+During development, live log tailing gives you real-time output from the running compositor. From inside your nested session or from a second terminal:
+
+```sh
+watch -n 0.1 "grep -v \"arranged\" $XDG_RUNTIME_DIR/hypr/$HYPRLAND_INSTANCE_SIGNATURE/hyprland.log | tail -n 40"
+```
+
+Replace `hyprland` with `hyprlandd` when watching debug build output.
+
+When a crash occurs, use `coredumpctl` to inspect the dump:
+
+```sh
+coredumpctl
+coredumpctl info PID
+```
+
+Replace `PID` with the PID of the crashed Hyprland process shown in the `coredumpctl` listing. For full instructions on capturing and submitting a stacktrace, see the [Crashes and Bugs](/crashes-and-bugs) page.
+
+<Tip>
+  Running Hyprland in a debug build as your daily driver for a period can expose intermittent bugs that are hard to reproduce on demand. The extra symbols in the debug binary make crash reports far more useful.
+</Tip>
+
+## Getting Help
+
+<CardGroup cols={2}>
+  <Card title="Discord" icon="discord" href="https://discord.gg/hQ9XvMUjjr">
+    Chat with other contributors and maintainers in the official Hyprland Discord server.
+  </Card>
+  <Card title="GitHub Discussions" icon="github" href="https://github.com/hyprwm/Hyprland/discussions">
+    Open a discussion for questions, feature proposals, or bugs that need more investigation before becoming issues.
+  </Card>
+  <Card title="PR Guidelines" icon="code-pull-request" href="/contributing/pr-guidelines">
+    Read the code style rules, naming conventions, and PR requirements before submitting.
+  </Card>
+  <Card title="Crashes & Bugs" icon="bug" href="/crashes-and-bugs">
+    Detailed procedures for collecting logs, crash reports, and debug stacktraces.
+  </Card>
+</CardGroup>

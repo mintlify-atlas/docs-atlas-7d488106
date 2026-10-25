@@ -1,0 +1,177 @@
+---
+title: "Configuring Animations and Curves in Hyprland"
+sidebarTitle: "Animations"
+description: "Guide to Hyprland animations: the animation tree, bezier and spring curves, styles, speed settings, and per-leaf overrides for windows and workspaces."
+---
+
+Hyprland's animation system is tree-based: every animation node inherits from its parent, so you can set a global style and selectively override individual leaves. Animations are declared with `hl.animation()` and curves are defined with `hl.curve()`.
+
+## Syntax
+
+```lua
+hl.animation({ leaf = string, enabled = bool, speed = float, bezier = string, style? = string })
+-- or with a spring curve:
+hl.animation({ leaf = string, enabled = bool, speed = float, spring = string, style? = string })
+```
+
+| Field | Description |
+| --- | --- |
+| `leaf` | Which animation node to configure. See the [Animation Tree](#animation-tree) |
+| `enabled` | `true` to enable, `false` to disable. Other fields can be omitted when disabling |
+| `speed` | Duration in **deciseconds** (100 ms each). `speed = 1` → 100 ms |
+| `bezier` / `spring` | Name of a curve defined with `hl.curve()` |
+| `style` | Animation style. Available styles depend on the leaf — see the tree below |
+
+### Examples
+
+```lua
+hl.animation({ leaf = "workspaces", enabled = true, speed = 8, bezier = "my_epic_bezier" })
+hl.animation({ leaf = "windows",    enabled = true, speed = 10, spring = "my_epic_spring", style = "slide" })
+hl.animation({ leaf = "fade",       enabled = false })
+```
+
+---
+
+## Animation Tree
+
+Animations form an inheritance tree. An unset leaf inherits its parent's values.
+
+```
+global
+  ↳ windows — styles: slide, popin, gnomed
+    ↳ windowsIn  — window open
+    ↳ windowsOut — window close
+    ↳ windowsMove — moving, dragging, resizing
+  ↳ layers — styles: slide, popin, fade
+    ↳ layersIn  — layer open
+    ↳ layersOut — layer close
+  ↳ fade
+    ↳ fadeIn         — fade in on window open
+    ↳ fadeOut        — fade out on window close
+    ↳ fadeSwitch     — fade when active window or opacity changes
+    ↳ fadeShadow     — fade on shadow of active window change
+    ↳ fadeGlow       — fade on glow of active window change
+    ↳ fadeDim        — easing for inactive window dimming
+    ↳ fadeLayers
+      ↳ fadeLayersIn  — fade in for layer open
+      ↳ fadeLayersOut — fade out for layer close
+    ↳ fadePopups
+      ↳ fadePopupsIn  — fade in for Wayland popup open
+      ↳ fadePopupsOut — fade out for Wayland popup close
+    ↳ fadeDpms — fade when DPMS is toggled
+  ↳ border       — border color switch speed
+  ↳ borderangle  — border gradient angle — styles: once (default), loop
+  ↳ shadowangle  — shadow gradient angle — styles: once, loop
+  ↳ glowangle    — glow gradient angle   — styles: once, loop
+  ↳ workspaces — styles: slide, slidevert, fade, slidefade, slidefadevert
+    ↳ workspacesIn  — workspace open animation
+    ↳ workspacesOut — workspace close animation
+    ↳ specialWorkspace — styles: same as workspaces
+      ↳ specialWorkspaceIn
+      ↳ specialWorkspaceOut
+  ↳ zoomFactor   — screen zoom animation
+  ↳ monitorAdded — zoom animation when a monitor is connected
+```
+
+<Warning>
+Using the `loop` style for `borderangle`, `shadowangle`, or `glowangle` forces Hyprland to render new frames continuously at your monitor's refresh rate. This impacts battery life and CPU/GPU usage even when those decorations are not visible.
+</Warning>
+
+---
+
+## Curves
+
+### Bezier Curves
+
+A cubic Bézier curve is defined by two configurable control points (X0, Y0) and (X1, Y1). Values outside [0, 1] are allowed for overshoot effects.
+
+```lua
+hl.curve("overshoot", { type = "bezier", points = { {0.5, 0.9}, {0.1, 1.1} } })
+```
+
+<Tip>
+Use [cssportal.com](https://www.cssportal.com/css-cubic-bezier-generator/) to design Bézier curves visually, or browse pre-made ones at [easings.net](https://easings.net).
+</Tip>
+
+### Spring Curves
+
+Spring curves mimic Apple's physical spring system. Keep `mass = 1` and tune `stiffness` and `damping`:
+
+```lua
+hl.curve("rubber", { type = "spring", mass = 1, stiffness = 70, damping = 10 })
+```
+
+| Parameter | Effect |
+| --- | --- |
+| `mass` | Inertia of the spring. Keep at `1` for most use cases |
+| `stiffness` | Higher = faster animation |
+| `damping` | Higher = less bounce |
+
+<Accordion title="Spring damping explained">
+Spring behaviour is governed by the damping ratio ζ = c / (2 × √(k × m)):
+
+- **Critically damped** (ζ = 1): Settles fast with no overshoot. Recommended values around `0.6` to `0.8` for a responsive, smooth feel.
+- **Overdamped** (ζ > 1): Returns slowly without oscillation.
+- **Underdamped** (ζ < 1): Oscillates (bounces) with exponentially decaying amplitude.
+</Accordion>
+
+---
+
+## Animation Style Extras
+
+### `popin` with a Minimum Percentage
+
+Animate a window from a percentage of its final size:
+
+```lua
+-- Window grows from 80% to 100%
+hl.animation({ leaf = "windows", enabled = true, speed = 8, bezier = "default", style = "popin 80%" })
+```
+
+### `slidefade` with a Movement Percentage
+
+Control how far windows slide during a workspace transition:
+
+```lua
+-- Windows move 20% of the screen width
+hl.animation({ leaf = "workspaces", enabled = true, speed = 8, bezier = "default", style = "slidefade 20%" })
+```
+
+### Forced Slide Direction for Windows and Layers
+
+For `slide` on `windows` and `layers`, specify a side:
+
+```lua
+hl.animation({ leaf = "windows", enabled = true, speed = 8, bezier = "default", style = "slide left" })
+hl.animation({ leaf = "layersIn", enabled = true, speed = 4, bezier = "default", style = "slide top" })
+```
+
+Valid directions: `top`, `bottom`, `left`, `right`.
+
+---
+
+## Full Example
+
+```lua
+-- Define curves
+hl.curve("easeOutQuint", { type = "bezier", points = { {0.22, 1}, {0.36, 1} } })
+hl.curve("softSpring",   { type = "spring", mass = 1, stiffness = 100, damping = 14 })
+
+-- Global animation base
+hl.animation({ leaf = "global", enabled = true, speed = 8, bezier = "easeOutQuint" })
+
+-- Windows slide in/out
+hl.animation({ leaf = "windowsIn",  enabled = true, speed = 6,  spring = "softSpring", style = "slide" })
+hl.animation({ leaf = "windowsOut", enabled = true, speed = 5,  bezier = "easeOutQuint", style = "slide" })
+hl.animation({ leaf = "windowsMove", enabled = true, speed = 8, spring = "softSpring" })
+
+-- Workspace transitions
+hl.animation({ leaf = "workspaces", enabled = true, speed = 8, bezier = "easeOutQuint", style = "slidefade 15%" })
+
+-- Fades
+hl.animation({ leaf = "fade",    enabled = true,  speed = 4, bezier = "easeOutQuint" })
+hl.animation({ leaf = "fadeDim", enabled = true,  speed = 4, bezier = "easeOutQuint" })
+
+-- Disable border angle loop to save power
+hl.animation({ leaf = "borderangle", enabled = false })
+```

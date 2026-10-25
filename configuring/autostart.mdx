@@ -1,0 +1,95 @@
+---
+title: "Autostarting Applications in Hyprland"
+sidebarTitle: "Autostart"
+description: "Learn how to autostart programs when Hyprland launches, and how to run cleanup commands on shutdown, using Hyprland's Lua event system."
+---
+
+Hyprland's configuration is Lua-based, which means you can autostart applications by listening to lifecycle events rather than maintaining a static list of commands. The `hyprland.start` event fires once after Hyprland has fully initialised, making it the right place to launch your bar, wallpaper tool, notification daemon, and anything else your desktop needs.
+
+## Autostarting on Launch
+
+Register a listener for the `hyprland.start` event using `hl.on()`:
+
+```lua
+hl.on("hyprland.start", function()
+    hl.exec_cmd(terminal)
+    hl.exec_cmd("nm-applet")
+    hl.exec_cmd("waybar & hyprpaper & firefox")
+end)
+```
+
+All calls to `hl.exec_cmd()` inside this callback will be spawned when Hyprland is ready. You can call it as many times as needed, or chain commands with `&` inside a single string.
+
+<Note>
+`hl.exec_cmd()` runs commands asynchronously — the callback does not wait for the previous command to finish before launching the next. If you need sequential behaviour, use event listeners on the spawned processes.
+</Note>
+
+## Running Commands on Shutdown
+
+In the same vein, you can react to Hyprland exiting by listening to the `hyprland.shutdown` event:
+
+```lua
+hl.on("hyprland.shutdown", function()
+    hl.exec_cmd("notify-send 'Hyprland is shutting down'")
+end)
+```
+
+This is useful for cleanup tasks, saving state, or gracefully closing background daemons before the session ends.
+
+## Practical Example
+
+A typical autostart block might look like this:
+
+```lua
+hl.on("hyprland.start", function()
+    -- Wallpaper daemon
+    hl.exec_cmd("hyprpaper")
+
+    -- Status bar
+    hl.exec_cmd("waybar")
+
+    -- Network manager tray icon
+    hl.exec_cmd("nm-applet --indicator")
+
+    -- Notification daemon
+    hl.exec_cmd("dunst")
+
+    -- Polkit agent
+    hl.exec_cmd("/usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1")
+
+    -- Idle manager
+    hl.exec_cmd("hypridle")
+end)
+```
+
+<Tip>
+For programs managed by systemd, consider using `systemd --user` units and `systemctl --user start` instead of `hl.exec_cmd()`. Hyprland sets the correct `WAYLAND_DISPLAY` environment variable in the systemd user environment, so services started via systemd will find the display automatically.
+</Tip>
+
+## Launching Programs on Workspace Creation
+
+If you want to open a specific application whenever a new workspace is created, use the `workspace.created` event:
+
+```lua
+local workspace_programs = {
+    ["5"] = { "firefox", { float = true } },
+    ["6"] = { "kitty",   { fullscreen = true } },
+}
+
+hl.on("workspace.created", function(ws)
+    if ws.is_empty then return end
+
+    local program = workspace_programs[ws.name]
+    if program == nil then return end
+
+    local cmd, rules = table.unpack(program)
+    local rules2 = {}
+    for k, v in pairs(rules) do rules2[k] = v end
+    rules2.workspace = ws.name .. " silent"
+    hl.exec_cmd(cmd, rules2)
+end)
+```
+
+<Info>
+See the [Events documentation](/configuring/advanced/events) for the full list of events you can hook into with `hl.on()`.
+</Info>

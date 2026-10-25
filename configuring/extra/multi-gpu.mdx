@@ -1,0 +1,178 @@
+---
+title: "Multi-GPU and Virtual GPU Configuration in Hyprland"
+sidebarTitle: Multi-GPU
+description: Configure AQ_DRM_DEVICES to select GPUs in Hyprland, create stable udev symlinks, and run Hyprland on virtual GPU partitions with AQ_NO_KMS_REQUIREMENT.
+---
+
+Hyprland supports systems with multiple GPUs, including gaming laptops with discrete and integrated GPUs, desktop machines with more than one GPU, and virtual GPU (vGPU) passthrough setups. By default, Hyprland picks the primary GPU automatically, but you can override this behaviour using environment variables to select which GPU to use for rendering, improve battery life on laptops, or run on render-only cards with no display output.
+
+## Detecting Your GPUs
+
+Before configuring anything, identify which GPUs are present and which DRM device nodes they correspond to.
+
+List all PCI display controllers:
+
+```bash
+lspci -d ::03xx
+```
+
+Example output from a laptop with both a discrete NVIDIA GPU and an integrated AMD GPU:
+
+```plain
+01:00.0 VGA compatible controller: NVIDIA Corporation TU117M [GeForce GTX 1650 Mobile / Max-Q] (rev a1)
+06:00.0 VGA compatible controller: Advanced Micro Devices, Inc. [AMD/ATI] Cezanne [Radeon Vega Series / Radeon Vega Mobile Series] (rev c6)
+```
+
+Now map those PCI addresses to DRM device nodes:
+
+```bash
+ls -l /dev/dri/by-path
+```
+
+Example output:
+
+```plain
+lrwxrwxrwx 1 root root  8 Jul 14 15:45 pci-0000:01:00.0-card -> ../card0
+lrwxrwxrwx 1 root root 13 Jul 14 15:45 pci-0000:01:00.0-render -> ../renderD128
+lrwxrwxrwx 1 root root  8 Jul 14 15:45 pci-0000:06:00.0-card -> ../card1
+lrwxrwxrwx 1 root root 13 Jul 14 15:45 pci-0000:06:00.0-render -> ../renderD129
+```
+
+The AMD card at PCI address `06:00.0` corresponds to `pci-0000:06:00.0-card`. Do **not** use the `card0`, `card1`, etc. symlinks directly — these are dynamically assigned at boot and may change between reboots.
+
+## Selecting the GPU with AQ_DRM_DEVICES
+
+Once you know which card belongs to which GPU, set `AQ_DRM_DEVICES` to a colon-separated list of card paths in order of priority:
+
+```lua
+hl.env("AQ_DRM_DEVICES", "/dev/dri/card0:/dev/dri/card1")
+```
+
+Here `card0` is the primary renderer. If it is unavailable, `card1` becomes primary.
+
+<Note>
+  If you have a monitor connected to a GPU that is not the primary renderer (e.g., an external monitor on `card1`), that card must still appear in `AQ_DRM_DEVICES` for the monitor to work — it just does not need to be listed first.
+
+  For laptops, using the integrated GPU as the primary renderer is generally recommended: it uses less power and is practically indistinguishable from the discrete GPU for compositor rendering workloads on modern hardware.
+</Note>
+
+## Creating Stable Device Paths with udev
+
+The `/dev/dri/card*` paths change dynamically and cannot be safely used in `AQ_DRM_DEVICES` long-term. Create stable udev symlinks instead.
+
+<Steps>
+  <Step title="Find your GPU's PCI ID">
+    ```bash
+    lspci -d ::03xx | grep 'AMD'
+    # Example output: 06:00.0 VGA compatible controller: ...
+    ```
+  </Step>
+  <Step title="Create a udev rule for the symlink">
+    The following script creates a udev rule that creates a persistent symlink at `/dev/dri/amd-igpu`:
+
+    ```sh
+    SYMLINK_NAME="amd-igpu"
+    RULE_PATH="/etc/udev/rules.d/amd-igpu-dev-path.rules"
+    AMD_IGPU_ID=$(lspci -d ::03xx | grep 'AMD' | cut -f1 -d' ')
+
+    cat <<EOF | sudo tee "$RULE_PATH"
+    KERNEL=="card*", \
+    KERNELS=="0000:$AMD_IGPU_ID", \
+    SUBSYSTEM=="drm", \
+    SUBSYSTEMS=="pci", \
+    SYMLINK+="dri/$SYMLINK_NAME"
+    EOF
+    ```
+  </Step>
+  <Step title="Reload udev rules">
+    ```sh
+    sudo udevadm control --reload
+    sudo udevadm trigger
+    ```
+
+    Verify the symlink was created:
+
+    ```bash
+    ls -l /dev/dri/amd-igpu
+    # lrwxrwxrwx 1 root root 5 /dev/dri/amd-igpu -> card1
+    ```
+  </Step>
+  <Step title="Use the stable symlink in your config">
+    ```lua
+    hl.env("AQ_DRM_DEVICES", "/dev/dri/amd-igpu")
+    ```
+
+    This symlink will automatically update to point to the correct card node across reboots.
+  </Step>
+</Steps>
+
+## Virtual GPU (vGPU) Setup
+
+Some GPUs support virtual partitioning via mediated devices or SR-IOV, creating multiple virtual GPU instances from a single physical card. The following GPU families support this feature:
+
+- Intel Arc Pro cards
+- Intel laptop integrated graphics
+- NVIDIA Workstation and Server cards (e.g., RTX A-series)
+- NVIDIA RTX 2000 series
+- AMD Radeon Instinct cards
+
+<Note>
+  This section does **not** apply to paravirtualized drivers like Virtio-GPU. Virtio-GPU is a fully software-emulated device that provides an emulated screen output — you can use Hyprland with it without any extra configuration.
+</Note>
+
+### Hyprland Requires a Display Output — Bypassing This on vGPUs
+
+By default, Hyprland requires that the GPU it runs on has at least one display output (a KMS device). vGPUs are render-only cards and have no display output on Linux. To allow Hyprland to start on a render-only vGPU, set the `AQ_NO_KMS_REQUIREMENT` flag:
+
+```lua
+hl.env("AQ_NO_KMS_REQUIREMENT", "1")
+```
+
+### Using Both a vGPU and a Hardware GPU Together
+
+<Warning>
+  This section is relevant for QEMU users doing vGPU passthrough while also exposing a Virtio-GPU device in the same virtual machine.
+</Warning>
+
+When both a vGPU and a hardware GPU (e.g., Virtio-GPU) are present, `/dev/dri` will contain multiple nodes. Hyprland selects the primary renderer automatically, but the selection may not be consistent across reboots. You must set `AQ_DRM_DEVICES` explicitly to control priority:
+
+```lua
+hl.env("AQ_NO_KMS_REQUIREMENT", "1")
+hl.env("AQ_DRM_DEVICES", "/dev/dri/card0:/dev/dri/card1")
+```
+
+<Tip>
+  Some hypervisors expose PCI topologies that are interpreted differently at each boot, meaning `card0` and `card1` may swap. Use the [udev stable symlink method](#creating-stable-device-paths-with-udev) above to make your configuration consistent across reboots.
+</Tip>
+
+### Accessing the Virtual Display Remotely
+
+When Hyprland starts on a GPU with no physical display output, it automatically initialises a headless output named `HEADLESS-0` at `1920x1080@60Hz`. You can customise this resolution in your `hyprland.lua` using `hl.monitor(...)`.
+
+To interact with this headless session, use a remote desktop server that supports the wlroots capture protocol:
+
+<CardGroup cols={3}>
+  <Card title="Sunshine / Moonlight" href="https://app.lizardbyte.dev/Sunshine/">
+    Popular open-source game streaming with low latency.
+  </Card>
+  <Card title="Apollo / Artemis" href="https://github.com/ClassicOldSong/Apollo">
+    Moonlight Noir fork with additional features.
+  </Card>
+  <Card title="WayVNC" href="https://github.com/any1/wayvnc">
+    A VNC server for Wayland compositors.
+  </Card>
+</CardGroup>
+
+Start your remote server from the guest using `hyprctl`:
+
+```bash
+hyprctl --instance 0 eval 'hl.exec_cmd("Sunshine")'
+```
+
+The server must be started as a child of the Hyprland process so it inherits the correct environment variables (including `WAYLAND_DISPLAY`). Once everything is working, add it to your `hyprland.lua` for autostart:
+
+```lua
+hl.on("hyprland.start", function()
+    hl.exec_cmd("Sunshine")
+end)
+```

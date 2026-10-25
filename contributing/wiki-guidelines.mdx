@@ -1,0 +1,155 @@
+---
+title: "Hyprland Wiki Contribution and Formatting Guidelines"
+sidebarTitle: "Wiki Guidelines"
+description: "Content standards, prose style, option table sorting, description rules, and translation guidance for contributing to the Hyprland wiki."
+---
+
+The Hyprland wiki is maintained collaboratively. Anyone can contribute improvements, corrections, or new pages through a pull request. Before you do, read this page carefully — consistent formatting and clear prose are just as important here as correct code is in a code contribution.
+
+## General Prose Style
+
+Wiki content follows the [semantic line breaks](https://sembr.org) convention (inspired by [xkcd 1285](https://xkcd.com/1285)): write a new line after every sentence. These line breaks are invisible in the rendered output but keep diffs small and source files easy to read and edit.
+
+Additional style rules that apply everywhere:
+
+- **Code block indentation:** Use 4 spaces, not tabs or other schemes.
+- **Warnings** must appear at the top of the section they apply to.
+- **Abbreviations** must be capitalised (e.g., `DRM`, `GPU`, `TTY`).
+- **Spelling** follows standard United States English conventions.
+- **Trailing punctuation** is placed outside of quotation marks.
+
+## Sorting Config Option Tables
+
+Tables of configuration options follow a fixed sort order.
+
+<Steps>
+  <Step title="Global toggle first">
+    An `enabled` option, if it exists, must always be listed first.
+  </Step>
+
+  <Step title="Display-related options next">
+    If the table includes any of `output`, `position`, `scale`, `transform`, or `rotation`, they must appear next, in exactly that order.
+  </Step>
+
+  <Step title="Remaining options alphabetically">
+    All other options follow in alphabetical order, with one exception: when alphabetical ordering would separate options that are closely related in meaning, they may be grouped together instead (see the next step).
+  </Step>
+
+  <Step title="Document any non-alphabetical ordering">
+    If you sort related options together rather than alphabetically, add a comment beginning with `SORT: ` immediately before the table explaining the grouping. Mention the non-standard sorting in your PR description as well.
+  </Step>
+</Steps>
+
+## Writing Option Descriptions
+
+Keep descriptions concise. They must start with a capital letter and end **without** a full stop (period).
+
+- If an option only accepts a fixed set of predefined values, list them in the description.
+- If there are more than four predefined values, create a subsection below the table and link to it from the description field.
+- If an option has enforced limits (minimum, maximum), specify them in the `Limits` field matching the type.
+- If additional explanation is genuinely needed, create a subsection and link to it from the table rather than expanding the description inline.
+
+## Adding New Dispatchers
+
+When documenting a new dispatcher, structure its positional arguments to answer these questions in order:
+
+1. **What is addressed?** (the target object or window)
+2. **What action to perform?**
+3. **How to perform the action?**
+
+## HTML Comments for Maintenance
+
+HTML comments (`<!-- -->`) are not rendered on the page but are useful for leaving notes to future editors. Use a standard tag on the first line of the comment when appropriate:
+
+| Tag | Purpose |
+|---|---|
+| `WARNING: ` | Flag a potential mistake or hazard |
+| `NOTE: ` | General informational note for editors |
+| `TODO: ` | Work that still needs doing |
+| `SORT: ` | Describe a non-standard sort order applied to a nearby table |
+
+Keep one space between the tag and the message body (`TODO: body here`).
+
+## PR Requirements for Wiki Changes
+
+Wiki PRs follow the same general process as code PRs, with a few specific points:
+
+- Describe what you changed and why in the PR body.
+- For factual corrections, link to the authoritative source where possible.
+- For new pages, ensure the page is added to the navigation in `docs.json`.
+- For option documentation, confirm values and defaults against the actual Hyprland source code — do not invent or estimate them.
+
+<Note>
+  Wiki-only PRs do not require vouching. However, maintaining quality and correctness is still expected.
+</Note>
+
+## Contributing Translations
+
+Some parts of the Hyprland ecosystem are localised. Translation contributions are exempt from the vouch requirement.
+
+Translations are written in C++ but are straightforward and require no specialist C++ knowledge. You submit them as a normal pull request on GitHub.
+
+### Finding the Translation File
+
+Translation files for apps that are ready to translate:
+
+- [hyprland](https://github.com/hyprwm/Hyprland/blob/main/src/i18n/Engine.cpp)
+- [hyprlauncher](https://github.com/hyprwm/hyprlauncher/blob/main/src/i18n/Engine.cpp)
+- [hyprpwcenter](https://github.com/hyprwm/hyprpwcenter/blob/main/src/i18n/Engine.cpp)
+
+More apps are being localised; this list will be updated as they become ready.
+
+### Basic (Unconditional) Translations
+
+Register a translation for a key and your language code. For example, to add a Polish translation for `TXT_KEY_HELLO`:
+
+```cpp
+registerEntry("pl_PL", TXT_KEY_HELLO, "Siemka!");
+```
+
+Translations can include named variables using `{variable_name}` syntax:
+
+```cpp
+registerEntry("pl_PL", TXT_KEY_HELLO, "Siemka, {name}!");
+```
+
+### Conditional Translations
+
+Some languages require different forms depending on context (for example, singular vs. plural). Use a lambda for these cases:
+
+```cpp
+registerEntry("pl_PL", TXT_KEY_HELLO, [](const Hyprutils::I18n::translationVarMap& vars) {
+    int peopleAmount = std::stoi(vars.at("count"));
+    if (peopleAmount == 1)
+        return "Mam {count} dziewczynkę anime.";
+    int last = peopleAmount % 10;
+    int lastTwo = peopleAmount % 100;
+    if (last >= 2 && last <= 4 && !(lastTwo >= 12 && lastTwo <= 14))
+        return "Mam {count} dziewczynki anime.";
+    return "Mam {count} dziewczynek anime.";
+});
+```
+
+All variables arrive as strings; use standard conversion functions such as `std::stoi` to obtain numeric values.
+
+### Fallback Behaviour
+
+You do not need separate entries for regional variants if the translations are identical. The fallback chain for a missing locale is:
+
+1. `xy_ZT` (exact locale)
+2. `xy_XY` (same language, different region)
+3. `xy_ANYTHING` (any variant of the same language)
+4. Global fallback (usually `en_US`)
+
+For example, if you provide a `de_DE` entry and the user's locale is `de_AT` with no `de_AT` entry, `de_DE` will be used automatically.
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="PR Guidelines" icon="code-pull-request" href="/contributing/pr-guidelines">
+    Code style, naming conventions, and PR requirements for Hyprland source contributions.
+  </Card>
+  <Card title="Contributing Overview" icon="wrench" href="/contributing/overview">
+    Get vouched, build in debug mode, and set up your development environment.
+  </Card>
+</CardGroup>

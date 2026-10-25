@@ -1,0 +1,309 @@
+---
+title: "Using hyprctl to Control, Query, and Script Hyprland"
+sidebarTitle: hyprctl
+description: "Complete reference for hyprctl — the CLI tool built into Hyprland for dispatching commands, querying state, and scripting compositor control."
+---
+
+`hyprctl` is a command-line utility installed alongside Hyprland that lets you control and query the compositor from a shell or script. Commands are dispatched synchronously, so spamming them can cause slowdowns — use the `--batch` flag when issuing many calls at once, and prefer the [events system](/configuring/advanced/events) for real-time handling.
+
+<Warning>
+  `hyprctl` calls are processed by the compositor **synchronously**. Issuing many rapid calls in a tight loop will degrade performance. Use `--batch` to bundle multiple commands into a single round-trip, and avoid polling with info commands when event callbacks can be used instead.
+</Warning>
+
+## Control Commands
+
+These commands change compositor state.
+
+<Accordion title="eval">
+  Execute a Lua string dynamically inside the compositor. Returns `"ok"` on success, or any Lua error that was raised.
+
+  ```sh
+  hyprctl eval 'hl.dispatch(hl.dsp.focus({ workspace = "3" }))'
+  ```
+</Accordion>
+
+<Accordion title="repl">
+  Start an interactive Lua REPL session, or pass a Lua expression to evaluate and print its result via `tostring()`. Exit an interactive session with `Ctrl+D`.
+
+  ```sh
+  hyprctl repl          # start interactive REPL
+  hyprctl repl [code]   # evaluate code and print the result
+  ```
+
+  <CodeGroup>
+    ```sh Single expression
+    $ hyprctl repl 'hl.get_active_window().class'
+    foot
+    ```
+
+    ```sh Interactive session
+    $ hyprctl repl
+    > for i,w in pairs(hl.get_windows()) do print(i, w.class) end
+    1       foot
+    2       firefox
+    3       codium
+    > hl.notification.create({ text = "Hello World", timeout = 2000 })
+    HL.Notification(0x563c0a1ebe70)
+    ```
+  </CodeGroup>
+</Accordion>
+
+<Accordion title="dispatch">
+  Shorthand for `eval 'hl.dispatch(...)'`. Pass a dispatcher expression directly.
+
+  ```sh
+  hyprctl dispatch 'hl.dsp.focus({ workspace = "3" })'
+  ```
+
+  See [Dispatchers](/configuring/dispatchers) for a full list of available dispatchers.
+</Accordion>
+
+<Accordion title="reload">
+  Force the compositor to reload the config file.
+
+  ```sh
+  hyprctl reload
+  ```
+
+  `reload full-reset` recreates the entire config context, which is necessary when switching between Lua and hyprlang config formats. Use it only when absolutely required.
+
+  ```sh
+  hyprctl reload full-reset
+  ```
+</Accordion>
+
+<Accordion title="kill">
+  Enter kill mode, where clicking any window closes it — similar to `xkill`. Press `Escape` to exit kill mode.
+
+  ```sh
+  hyprctl kill
+  ```
+</Accordion>
+
+<Accordion title="setcursor">
+  Set the cursor theme and size, then reload the cursor manager. Accepts only **hyprcursor** themes since Hyprland 0.37.0. For legacy XCursor themes use the `XCURSOR_THEME` and `XCURSOR_SIZE` environment variables.
+
+  ```sh
+  hyprctl setcursor Bibata-Modern-Classic 24
+  ```
+</Accordion>
+
+<Accordion title="output">
+  Create or remove fake compositor outputs backed by a chosen backend.
+
+  ```sh
+  hyprctl output create [backend] (name)
+  hyprctl output remove [name]
+  ```
+
+  `create` and `add` are equivalent; `remove` and `destroy` are equivalent. The `(name)` parameter is optional — omitting it uses the default naming scheme (`HEADLESS-2`, `WL-1`, etc.).
+
+  **Available backends:**
+
+  | Backend | Description |
+  |---------|-------------|
+  | `wayland` | Creates an output as a Wayland window. Only works when Hyprland itself is running under a Wayland session (nested). |
+  | `headless` | Creates a headless monitor. Use this for VNC / RDP / Sunshine servers. |
+  | `auto` | Selects the appropriate backend automatically (e.g., `headless` from a TTY). |
+
+  ```sh
+  hyprctl output create headless test
+  hyprctl output remove test
+  ```
+</Accordion>
+
+<Accordion title="switchxkblayout">
+  Change the active XKB layout index for a specific keyboard device.
+
+  ```sh
+  hyprctl switchxkblayout <DEVICE> <CMD>
+  ```
+
+  `CMD` is one of `next`, `prev`, or a numeric index (e.g., `0`, `1`, `2`). `DEVICE` can be a device name found via `hyprctl devices`, or the special values `current` (the main keyboard) or `all`.
+
+  ```sh
+  hyprctl switchxkblayout at-translated-set-2-keyboard next
+  ```
+
+  If you configure multiple layouts in your Lua config, the indices correspond to the comma-separated positions:
+
+  ```lua
+  hl.device({
+    name = "my-epic-keyboard-v1",
+    kb_layout = "us,pl,de"
+    -- us = 0, pl = 1, de = 2
+  })
+  ```
+
+  <Note>
+    When mixing layouts with variants, the number of comma-separated values for `kb_variant` must match `kb_layout`, or a single value can be provided to apply to all layouts.
+  </Note>
+</Accordion>
+
+<Accordion title="seterror">
+  Set a custom error string displayed by Hyprland. The string is cleared when the config is reloaded.
+
+  ```sh
+  hyprctl seterror 'rgba(66ee66ff)' hello world this is my problem
+  hyprctl seterror disable
+  ```
+</Accordion>
+
+<Accordion title="notify">
+  Send a notification through the built-in Hyprland notification system.
+
+  ```sh
+  hyprctl notify <ICON> <TIME_MS> <COLOR> <MESSAGE>
+  ```
+
+  To customize font size, prefix the message with `fontsize:<SIZE>`:
+
+  ```sh
+  hyprctl notify -1 10000 "rgb(ff1ea3)" "Hello everyone!"
+  hyprctl notify -1 10000 "rgb(ff0000)" "fontsize:35 This text is big"
+  ```
+
+  See [Notifications](/configuring/advanced/notifications) for the full icon and color reference.
+</Accordion>
+
+<Accordion title="dismissnotify">
+  Dismiss active notifications. With no argument or `-1`, all notifications are dismissed. Pass a positive integer to dismiss only the oldest N notifications.
+
+  ```sh
+  hyprctl dismissnotify      # dismiss all
+  hyprctl dismissnotify -1   # dismiss all (explicit)
+  hyprctl dismissnotify 2    # dismiss the 2 oldest
+  ```
+</Accordion>
+
+<Accordion title="settitlebar">
+  Set the titlebar state for a window. Refer to the dispatcher documentation for window selector syntax.
+</Accordion>
+
+<Accordion title="plugin">
+  Manage compositor plugins.
+
+  ```sh
+  hyprctl plugin load /path/to/plugin.so
+  hyprctl plugin unload /path/to/plugin.so
+  hyprctl plugin list
+  ```
+
+  <Warning>
+    Loading plugins this way is subject to the `plugin` [permission](/configuring/advanced/permissions). Avoid blanket-allowing `hyprctl` to load plugins; use `ask` or `deny` to prevent malicious plugin injection via a compromised shell.
+  </Warning>
+</Accordion>
+
+<Accordion title="keyword">
+  Set a single config option by keyword without reloading the entire config.
+
+  ```sh
+  hyprctl keyword general:border_size 2
+  ```
+</Accordion>
+
+---
+
+## Info / Query Commands
+
+These commands print compositor state and return `0` on success.
+
+<Tabs>
+  <Tab title="Windows & Workspaces">
+    | Command | Description |
+    |---------|-------------|
+    | `clients` | Lists all open windows and their properties. |
+    | `activewindow` | Prints the focused window name and properties. |
+    | `workspaces` | Lists all workspaces with their properties. |
+    | `activeworkspace` | Prints the active workspace and its properties. |
+    | `workspacerules` | Lists all defined workspace rules. |
+  </Tab>
+  <Tab title="Monitors & Layers">
+    | Command | Description |
+    |---------|-------------|
+    | `monitors` | Lists active outputs. `monitors all` includes inactive outputs. |
+    | `layers` | Lists all layer surfaces. |
+    | `cursorpos` | Prints the current cursor position in global layout coordinates. |
+  </Tab>
+  <Tab title="Input & Devices">
+    | Command | Description |
+    |---------|-------------|
+    | `devices` | Lists all connected keyboards and pointer devices. |
+    | `binds` | Lists all registered key bindings. |
+  </Tab>
+  <Tab title="Config & Runtime">
+    | Command | Description |
+    |---------|-------------|
+    | `version` | Prints the Hyprland version, build flags, commit, and branch. |
+    | `getoption [option]` | Gets the current value of a config option. |
+    | `configerrors` | Lists all current config parsing errors. |
+    | `animations` | Prints the current animation and bezier configuration. |
+    | `rollinglog` | Prints the tail of the Hyprland log. Supports `-f`/`--follow`. |
+    | `splash` | Prints the current random splash message. |
+    | `systeminfo` | Prints system information. |
+    | `instances` | Lists all running Hyprland instances. |
+    | `decorations [window]` | Lists decorations and their info for a window. |
+    | `layouts` | Lists all available layouts, including those from plugins. |
+    | `submap` | Prints the currently active keybind submap. |
+    | `activespecial` | Prints the active special workspace on the focused monitor. |
+  </Tab>
+</Tabs>
+
+### getoption
+
+Use dot-separated `section.option` notation:
+
+```sh
+hyprctl getoption general.border_size
+
+# Nested sections:
+hyprctl getoption input.touchpad.disable_while_typing
+```
+
+### getprop
+
+Get a property value of a specific window:
+
+```sh
+hyprctl getprop <window> <property>
+```
+
+`window` follows the standard [window selector syntax](/configuring/dispatchers#parameter-explanation). `property` can be any value settable via [set_prop](/configuring/dispatchers/#set_prop).
+
+<Note>
+  If `animationstyle` is unset, `(unset)` is returned. `min_size` defaults to `20 20`. `max_size` defaults to `inf inf` (or `[null,null]` in JSON output).
+</Note>
+
+### global
+
+Send a command to a global keybind handler registered by a plugin or external process.
+
+---
+
+## Batch Mode
+
+Pass the `--batch` flag to issue multiple semicolon-separated commands in a single compositor call. This is far more efficient than invoking `hyprctl` once per command in a loop.
+
+```sh
+hyprctl --batch "keyword general.border_size 1 ; keyword general.gaps_out 5"
+```
+
+<Warning>
+  Any semicolons inside an individual command in the batch (for example, multi-statement Lua code passed to `eval`) must be backslash-escaped. Literal backslashes must also be escaped. This escaping is **in addition to** any escaping required by your shell.
+</Warning>
+
+---
+
+## Flags
+
+Flags are placed immediately after `hyprctl`, before the command name:
+
+```sh
+hyprctl -j monitors
+```
+
+| Flag | Description |
+|------|-------------|
+| `-j` | Output in JSON format. |
+| `-i` | Select a specific Hyprland instance by ID or index from `hyprctl instances`. |
+| `-r` | Force a state refresh after issuing commands (useful after layout or rule changes). |

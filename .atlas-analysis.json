@@ -1,0 +1,129 @@
+{
+  "projectType": "general",
+  "projectName": "Hyprland Wiki",
+  "projectDescription": "The official documentation wiki for Hyprland, a dynamic tiling Wayland compositor with a Lua-based configuration system, plugins, and a rich ecosystem of tools.",
+  "theme": "palm",
+  "primaryColor": "#00cfe6",
+  "lightColor": "#111111",
+  "darkColor": null,
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": [
+              "introduction",
+              "getting-started/installation",
+              "getting-started/master-tutorial",
+              "getting-started/preconfigured-setups"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "configuring/config-options",
+              "configuring/binds",
+              "configuring/monitors",
+              "configuring/animations",
+              "configuring/rules",
+              "configuring/dispatchers",
+              "configuring/autostart",
+              "configuring/environment-variables",
+              "configuring/selectors"
+            ]
+          },
+          {
+            "group": "Layouts",
+            "pages": [
+              "configuring/layouts/overview",
+              "configuring/layouts/dwindle",
+              "configuring/layouts/master",
+              "configuring/layouts/monocle",
+              "configuring/layouts/scrolling",
+              "configuring/layouts/custom"
+            ]
+          },
+          {
+            "group": "Advanced Configuration",
+            "pages": [
+              "configuring/advanced/hyprctl",
+              "configuring/advanced/events",
+              "configuring/advanced/lua-utilities",
+              "configuring/advanced/notifications",
+              "configuring/advanced/permissions"
+            ]
+          },
+          {
+            "group": "IPC & Plugins",
+            "pages": [
+              "ipc",
+              "plugins/using-plugins",
+              "plugins/development"
+            ]
+          },
+          {
+            "group": "Platform Guides",
+            "pages": [
+              "nvidia",
+              "nix/overview",
+              "nix/nixos",
+              "nix/home-manager",
+              "configuring/extra/systemd",
+              "configuring/extra/xwayland",
+              "configuring/extra/performance",
+              "configuring/extra/tearing",
+              "configuring/extra/multi-gpu"
+            ]
+          },
+          {
+            "group": "Ecosystem & Utilities",
+            "pages": [
+              "ecosystem/user-apps",
+              "ecosystem/dev-libs",
+              "useful-utilities"
+            ]
+          },
+          {
+            "group": "Help & Contributing",
+            "pages": [
+              "faq",
+              "crashes-and-bugs",
+              "contributing/overview",
+              "contributing/pr-guidelines",
+              "contributing/wiki-guidelines"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Dynamic tiling Wayland compositor with GPU-accelerated rendering",
+    "Lua-based configuration system (hl.config, hl.bind, hl.dispatch)",
+    "Multiple tiling layouts: dwindle, master, monocle, scrolling, and custom",
+    "Powerful keybind system with flags, submaps, gestures, and per-device binds",
+    "Window rules, layer rules, and workspace rules for fine-grained control",
+    "Plugin system via hyprpm with C++ plugin development API",
+    "IPC via UNIX sockets (socket.sock and socket2.sock) for scripting",
+    "hyprctl utility for live compositor control and Lua REPL",
+    "First-class NixOS and Home Manager support",
+    "Rich Hypr* ecosystem: hyprlock, hypridle, hyprpaper, hyprcursor, and more",
+    "XWayland compatibility layer for legacy X11 applications",
+    "Multi-GPU, tearing, and virtual GPU support"
+  ],
+  "publicApiSurface": [
+    "hl.config({ ... }) — set configuration options",
+    "hl.bind(keys, dispatcher|function, flags?) — register a keybind",
+    "hl.dispatch(dispatcher) — execute a dispatcher",
+    "hl.dsp.* — dispatcher namespace (focus, exec_cmd, window.*, workspace.*, etc.)",
+    "hl.get_windows() / hl.get_active_window() — query window state",
+    "hl.notification.create({ text, timeout }) — create a notification",
+    "hl.permission(path, capability, action) — manage runtime permissions",
+    "hyprctl eval / repl / dispatch / reload / kill / setcursor — CLI control",
+    "$XDG_RUNTIME_DIR/hypr/[HIS]/.socket.sock — control socket",
+    "$XDG_RUNTIME_DIR/hypr/[HIS]/.socket2.sock — event socket",
+    "hyprpm add/list/enable/disable/reload — plugin manager CLI"
+  ]
+}

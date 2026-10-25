@@ -1,0 +1,164 @@
+---
+title: "Hyprland Lua Event System: Listening to Compositor Events"
+sidebarTitle: Events
+description: "Learn how to register Lua event listeners with hl.on() and handle the full set of compositor events fired by windows, workspaces, monitors, and more."
+---
+
+Hyprland's Lua config layer exposes a rich event system through `hl.on()`, allowing you to run arbitrary Lua code whenever something meaningful happens in the compositor — a window opens, a monitor is connected, a workspace changes, and much more. You can register as many listeners as you like for any event, and they fire in the order they were registered.
+
+## Registering a Listener
+
+Call `hl.on(event_name, callback)` anywhere in your Lua config. The callback receives the event's parameters as positional arguments.
+
+```lua
+hl.on("window.active", function(w)
+  hl.notification.create({
+    text = "Window focused: " .. w.title,
+    timeout = 5000,
+    icon = "ok"
+  })
+end)
+```
+
+For events that pass multiple objects, declare them as separate parameters:
+
+```lua
+hl.on("workspace.move_to_monitor", function(ws, m)
+  hl.notification.create({
+    text = "Workspace: " .. ws.name .. " moved to monitor at x: " .. m.position.x,
+    timeout = 4000,
+    icon = "ok"
+  })
+end)
+```
+
+<Tip>
+  Set up autocompletion in your editor to explore the fields available on `Window`, `Monitor`, `Workspace`, and other objects returned by events. See the [hyprctl REPL](/configuring/advanced/hyprctl) for an interactive way to explore available fields.
+</Tip>
+
+---
+
+## Full Event Reference
+
+<Tabs>
+  <Tab title="Window Events">
+    | Event | Parameters | Description |
+    |-------|------------|-------------|
+    | `window.active` | `Window`, `int` (focus reason) | Emitted when the active window changes. |
+    | `window.open` | `Window` | Emitted when a window is fully initialized with window rules applied. |
+    | `window.open_early` | `Window` | Emitted when a window is created and mapped, **before** window rules are applied. |
+    | `window.close` | `Window` | Emitted when a window is closed. The window may still be visible during its closing animation. |
+    | `window.destroy` | `Window` | Emitted when a window is removed from the compositor. For windows with a close animation, fires after the animation completes. |
+    | `window.title` | `Window` | Emitted when a window's title changes. |
+    | `window.class` | `Window` | Emitted when a window's class changes. |
+    | `window.fullscreen` | `Window` | Emitted when the fullscreen status of a window changes. |
+    | `window.minimize` | `Window`, `bool` | Emitted when a window requests a minimized-state change. `true` = requesting minimization, `false` = unminimization. |
+    | `window.move_to_workspace` | `Window`, `Workspace` | Emitted when a window is moved to a different workspace. |
+    | `window.pin` | `Window` | Emitted when a window is pinned or unpinned. |
+    | `window.urgent` | `Window` | Emitted when a window requests the `urgent` state. |
+    | `window.bell` | `Window` | Emitted when a window rings the system bell, even if it is muted. |
+    | `window.kill` | `Window` | Emitted when a window is forcefully killed via `hyprctl kill`. |
+    | `window.update_rules` | `Window` | Emitted when a window's rules are re-evaluated, e.g. when its title or class changes. |
+    | `window.update_state` | `Window`, state table | Emitted when a window's desktop state changes. State table contains flags such as `pinned` or `floating`; `nil` means the flag is unchanged. |
+  </Tab>
+  <Tab title="Workspace Events">
+    | Event | Parameters | Description |
+    |-------|------------|-------------|
+    | `workspace.active` | `Workspace` | Emitted when the active workspace on a monitor changes. |
+    | `workspace.created` | `Workspace` | Emitted when a workspace is created, after activating if appropriate. |
+    | `workspace.created_early` | `Workspace` | Emitted when a workspace is created, **before** it is activated. |
+    | `workspace.removed` | `Workspace` | Emitted when a workspace is removed. |
+    | `workspace.move_to_monitor` | `Workspace`, `Monitor` | Emitted when a workspace is moved to a different monitor. |
+    | `workspace.special_active` | `Workspace` (or `nil`), `Monitor` | Emitted when the open special workspace on a monitor changes. A `nil` workspace means no special workspace is currently open. |
+  </Tab>
+  <Tab title="Monitor Events">
+    | Event | Parameters | Description |
+    |-------|------------|-------------|
+    | `monitor.added` | `Monitor` | Emitted when a monitor is connected and ready. |
+    | `monitor.removed` | `Monitor` | Emitted when a monitor is disconnected and removed. |
+    | `monitor.focused` | `Monitor` | Emitted when the active monitor changes. |
+    | `monitor.layout_changed` | None | Emitted when the monitor arrangement changes — on monitor add/remove, resolution or refresh rate change, or a config reload with different rules. |
+  </Tab>
+  <Tab title="Layer & Input Events">
+    | Event | Parameters | Description |
+    |-------|------------|-------------|
+    | `layer.opened` | `LayerSurface` | Emitted when a layer surface is opened. |
+    | `layer.closed` | `LayerSurface` | Emitted when a layer surface is closed. |
+    | `keybinds.submap` | `string` (submap name) | Emitted when the active submap changes. An empty string means the default submap was restored. |
+    | `input.keyboard.key` | `int` (XKB keycode), `int` (Unix timestamp), `int` (state: 0=released, 1=pressed, 2=repeated) | Emitted on every key press or release. |
+    | `screenshare.state` | `bool` (active), `int` (type), `string` (name) | Emitted when a screenshare session starts or stops. |
+  </Tab>
+  <Tab title="Config & Lifecycle Events">
+    | Event | Parameters | Description |
+    |-------|------------|-------------|
+    | `config.reloaded` | None | Emitted when the config has been reloaded **and** fully applied. |
+    | `config.unload` | None | Emitted just before the config is unloaded and the Lua state is torn down (on reload or shutdown). Use this to close files, flush data, or save state before it is lost. |
+    | `config.props_refreshed` | `bool` | Emitted when a prop refresh event executes. `true` if scheduled normally; `false` if triggered early via `hl.exec_scheduled_prop_refresh_immediately()`. |
+    | `hyprland.start` | None | Emitted once when Hyprland finishes starting up. |
+    | `hyprland.shutdown` | None | Emitted once just before Hyprland exits. |
+  </Tab>
+</Tabs>
+
+---
+
+## Practical Examples
+
+<Steps>
+  <Step title="Log every window open">
+    Print the class and title of each new window to stdout as it opens.
+
+    ```lua
+    hl.on("window.open", function(w)
+      print("Opened: " .. w.class .. " — " .. w.title)
+    end)
+    ```
+  </Step>
+  <Step title="React to monitor connect/disconnect">
+    Show a notification whenever a monitor is plugged in or unplugged.
+
+    ```lua
+    hl.on("monitor.added", function(m)
+      hl.notification.create({
+        text = "Monitor connected: " .. m.name,
+        timeout = 4000,
+        icon = "info"
+      })
+    end)
+
+    hl.on("monitor.removed", function(m)
+      hl.notification.create({
+        text = "Monitor disconnected: " .. m.name,
+        timeout = 4000,
+        icon = "warn"
+      })
+    end)
+    ```
+  </Step>
+  <Step title="Save state before config reload">
+    The `config.unload` event is the right place to persist any Lua runtime state that should survive a config reload.
+
+    ```lua
+    hl.on("config.unload", function()
+      -- flush or save any runtime state here
+      print("Config unloading, saving state...")
+    end)
+    ```
+  </Step>
+  <Step title="Track submap changes">
+    React whenever the active keybind submap changes.
+
+    ```lua
+    hl.on("keybinds.submap", function(name)
+      if name == "" then
+        print("Returned to default submap")
+      else
+        print("Entered submap: " .. name)
+      end
+    end)
+    ```
+  </Step>
+</Steps>
+
+<Note>
+  For live event handling at the IPC level (from external programs, not Lua config), see the [IPC documentation](/ipc).
+</Note>

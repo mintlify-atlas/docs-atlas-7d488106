@@ -1,0 +1,152 @@
+---
+title: "IPC: Hyprland Sockets and Event Streaming"
+sidebarTitle: IPC
+description: "Control Hyprland and react to live events over two UNIX sockets — socket.sock for commands and socket2.sock for the event stream."
+---
+
+Hyprland exposes two UNIX sockets that allow external scripts, utilities, and applications to send commands and listen to live compositor events without polling. The request socket mirrors `hyprctl` functionality, while the event socket streams structured notifications as long as a client remains connected.
+
+## Hyprland Instance Signature
+
+Every running Hyprland instance exports a unique identifier called the **Hyprland Instance Signature (HIS)**. All socket paths are scoped under this identifier so multiple sessions can coexist without conflict.
+
+```sh
+echo $HYPRLAND_INSTANCE_SIGNATURE
+```
+
+The full base path for both sockets is:
+
+```
+$XDG_RUNTIME_DIR/hypr/$HYPRLAND_INSTANCE_SIGNATURE/
+```
+
+---
+
+## socket.sock — Request / Response
+
+The file `.socket.sock` under the instance directory accepts hyprctl-style commands. Write a request, read the response, then **close the connection immediately**.
+
+**Request format:**
+
+```
+[flags]/command args
+```
+
+**Example** — dispatch a workspace switch:
+
+```sh
+echo -n "dispatch workspace 2" | socat - \
+  UNIX-CONNECT:$XDG_RUNTIME_DIR/hypr/$HYPRLAND_INSTANCE_SIGNATURE/.socket.sock
+```
+
+<Warning>
+Hyprland evaluates connections to this socket **completely synchronously**. An unclosed connection will cause Hyprland to freeze until the five-second timeout is reached. Always open the socket immediately before writing, and close it the moment you are done.
+</Warning>
+
+---
+
+## socket2.sock — Event Stream
+
+The file `.socket2.sock` streams live compositor events to every connected client. Each event is a single newline-terminated line in the format:
+
+```
+EVENT>>DATA\n
+```
+
+For example, when the user switches to workspace 2:
+
+```
+workspace>>2
+```
+
+Clients simply keep the connection open and read lines as they arrive. Multiple clients can subscribe simultaneously.
+
+---
+
+## Events Reference
+
+<Warning>
+A `fullscreen` event is **not** guaranteed to fire on/off exactly once in succession. Some windows fire multiple fullscreen requests, which results in multiple consecutive events being emitted.
+</Warning>
+
+The table below lists every event name, a description of when it fires, and the data payload it carries.
+
+| Event | Description | Data |
+|---|---|---|
+| `workspace` | Emitted when a user requests a workspace change. Not emitted on mouse-driven monitor focus changes (see `focusedmon`). | `WORKSPACENAME` |
+| `workspacev2` | Same as `workspace` with an additional numeric ID. | `WORKSPACEID,WORKSPACENAME` |
+| `focusedmon` | Emitted when the active monitor changes. | `MONNAME,WORKSPACENAME` |
+| `focusedmonv2` | Same as `focusedmon` with workspace ID instead of name. | `MONNAME,WORKSPACEID` |
+| `activewindow` | Emitted when the active window changes. | `WINDOWCLASS,WINDOWTITLE` |
+| `activewindowv2` | Same as `activewindow`, carries the window address instead. | `WINDOWADDRESS` |
+| `fullscreen` | Emitted when a window's fullscreen state changes. | `0` (exit) / `1` (enter) |
+| `monitorremoved` | Emitted when a monitor is disconnected. | `MONITORNAME` |
+| `monitorremovedv2` | Same as `monitorremoved` with ID and description. | `MONITORID,MONITORNAME,MONITORDESCRIPTION` |
+| `monitoradded` | Emitted when a monitor is connected. | `MONITORNAME` |
+| `monitoraddedv2` | Same as `monitoradded` with ID and description. | `MONITORID,MONITORNAME,MONITORDESCRIPTION` |
+| `createworkspace` | Emitted when a new workspace is created. | `WORKSPACENAME` |
+| `createworkspacev2` | Same as `createworkspace` with an ID. | `WORKSPACEID,WORKSPACENAME` |
+| `destroyworkspace` | Emitted when a workspace is destroyed. | `WORKSPACENAME` |
+| `destroyworkspacev2` | Same as `destroyworkspace` with an ID. | `WORKSPACEID,WORKSPACENAME` |
+| `moveworkspace` | Emitted when a workspace is moved to a different monitor. | `WORKSPACENAME,MONNAME` |
+| `moveworkspacev2` | Same as `moveworkspace` with a workspace ID. | `WORKSPACEID,WORKSPACENAME,MONNAME` |
+| `renameworkspace` | Emitted when a workspace is renamed. | `WORKSPACEID,NEWNAME` |
+| `activespecial` | Emitted when the special workspace on a monitor changes. Closing the special workspace results in an empty `WORKSPACENAME`. | `WORKSPACENAME,MONNAME` |
+| `activespecialv2` | Same as `activespecial`; closing results in empty ID and name values. | `WORKSPACEID,WORKSPACENAME,MONNAME` |
+| `activelayout` | Emitted when the active keyboard layout changes. | `KEYBOARDNAME,LAYOUTNAME` |
+| `openwindow` | Emitted when a window is opened. | `WINDOWADDRESS,WORKSPACENAME,WINDOWCLASS,WINDOWTITLE` |
+| `closewindow` | Emitted when a window is closed. | `WINDOWADDRESS` |
+| `kill` | Emitted when a window is killed via `hyprctl kill`. | `WINDOWADDRESS` |
+| `movewindow` | Emitted when a window is moved to a workspace. | `WINDOWADDRESS,WORKSPACENAME` |
+| `movewindowv2` | Same as `movewindow` with a workspace ID. | `WINDOWADDRESS,WORKSPACEID,WORKSPACENAME` |
+| `openlayer` | Emitted when a layer surface is mapped. | `NAMESPACE` |
+| `closelayer` | Emitted when a layer surface is unmapped. | `NAMESPACE` |
+| `submap` | Emitted when the active keybind submap changes. Empty string means the default map is active. | `SUBMAPNAME` |
+| `changefloatingmode` | Emitted when a window changes its floating state. | `WINDOWADDRESS,FLOATING` (`0` or `1`) |
+| `urgent` | Emitted when a window requests the urgent hint. | `WINDOWADDRESS` |
+| `screencast` | Emitted when a screencopy client's state changes. There may be multiple independent clients. State is `0`/`1`; owner is `monitor`, `window`, or `region`. | `STATE,OWNER` |
+| `screencastv2` | Same as `screencast` with the identifier of the shared target (monitor name or window title). | `STATE,OWNER,NAME` |
+| `windowtitle` | Emitted when a window's title changes. | `WINDOWADDRESS` |
+| `windowtitlev2` | Same as `windowtitle`, also includes the new title string. | `WINDOWADDRESS,WINDOWTITLE` |
+| `togglegroup` | Emitted when `togglegroup` is used. State is `0` (destroyed) or `1` (created). For destruction, all former member addresses are included. | `0/1,WINDOWADDRESS(ES)` |
+| `moveintogroup` | Emitted when a window is merged into a group. | `WINDOWADDRESS` |
+| `moveoutofgroup` | Emitted when a window is removed from a group. | `WINDOWADDRESS` |
+| `ignoregrouplock` | Emitted when `ignoregrouplock` is toggled. | `0/1` |
+| `lockgroups` | Emitted when `lockgroups` is toggled. | `0/1` |
+| `configreloaded` | Emitted when the Hyprland config has finished reloading. | _(empty)_ |
+| `pin` | Emitted when a window is pinned or unpinned. | `WINDOWADDRESS,PINSTATE` |
+| `minimized` | Emitted when an external taskbar-like app requests a window to be minimized or restored. | `WINDOWADDRESS,0/1` |
+| `bell` | Emitted when an app requests the system bell via `xdg-system-bell-v1`. The window address may be empty. | `WINDOWADDRESS` |
+
+---
+
+## Shell Scripting with socket2
+
+The `socat` utility makes it straightforward to subscribe to the event stream from a shell script. Connect to socket2, read lines in a loop, and dispatch on the event name using a `case` statement.
+
+```sh
+#!/bin/sh
+
+handle() {
+  case $1 in
+    monitoradded*) do_something ;;
+    focusedmon*)   do_something_else ;;
+  esac
+}
+
+socat -U - UNIX-CONNECT:$XDG_RUNTIME_DIR/hypr/$HYPRLAND_INSTANCE_SIGNATURE/.socket2.sock \
+  | while read -r line; do handle "$line"; done
+```
+
+<Tip>
+Pattern-match on the event name with a trailing `*` glob so your script is robust against extra data fields being added to the payload in future Hyprland releases.
+</Tip>
+
+<CardGroup cols={2}>
+  <Card title="hyprctl Reference" icon="terminal">
+    All commands accepted by socket.sock mirror the `hyprctl` command-line interface. Refer to the hyprctl page for the full command list.
+  </Card>
+  <Card title="Hyprland Plugins" icon="puzzle-piece" href="/plugins/using-plugins">
+    Plugins can register their own dispatchers and config values, which are then also reachable via socket.sock.
+  </Card>
+</CardGroup>

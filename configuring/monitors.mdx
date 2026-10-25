@@ -1,0 +1,311 @@
+---
+title: "Configuring Monitors and Displays in Hyprland"
+sidebarTitle: "Monitors"
+description: "How to configure monitors in Hyprland: resolution, refresh rate, positioning, rotation, mirroring, VRR, color management, ICC profiles, and HDR."
+---
+
+Hyprland monitor configuration is done through the `hl.monitor()` Lua function. Each call declares a rule for one output (or a fallback for all unspecified outputs). Rules cover everything from resolution and refresh rate to color management, ICC profiles, and reserved areas for bars and docks.
+
+To list all available monitors — both active and inactive — run:
+
+```bash
+hyprctl monitors all
+```
+
+## Monitor Fields
+
+All fields beyond `output` are optional and fall back to sensible defaults.
+
+| Field | Description | Type | Default |
+| --- | --- | --- | --- |
+| `output` | Output name or `desc:...` description prefix | string | **Required** |
+| `disabled` | Remove the monitor from the layout | bool | `false` |
+| `mode` | Resolution and refresh rate (e.g. `"1920x1080@144"`). See [Modes](#modes) | string | `"preferred"` |
+| `scale` | Scale factor or `"auto"` for PPI-based scale | float/string | `"auto"` |
+| `transform` | Rotation/flip (0–7) | int | `0` |
+| `position` | Position in the virtual layout (e.g. `"1920x0"`). See [Positioning](#positioning) | string | `"auto"` |
+| `mirror` | Output name to mirror | string | `[[Empty]]` |
+| `bitdepth` | Bit depth: `8` or `10` | int | `8` |
+| `cm` | Color management preset | string | `"srgb"` |
+| `sdr_eotf` | SDR transfer function: `"default"` / `"gamma22"` / `"srgb"` | string | `"default"` |
+| `vrr` | VRR mode for this monitor | int | `0` |
+| `icc` | Absolute path to an ICC profile | string | `[[Empty]]` |
+| `reserved_area` | Reserved area for bars (int for all sides or table) | css_gaps | `0` |
+| `supports_wide_color` | Force wide color gamut: `-1`=off, `0`=auto, `1`=on | int | `0` |
+| `supports_hdr` | Force HDR: `-1`=off, `0`=auto, `1`=on | int | `0` |
+| `sdrbrightness` | SDR brightness in HDR mode | float | `1.0` |
+| `sdrsaturation` | SDR saturation in HDR mode | float | `1.0` |
+| `sdr_min_luminance` | SDR minimum luminance for SDR→HDR mapping | float | `0.2` |
+| `sdr_max_luminance` | SDR maximum luminance | int | `80` |
+
+## Fallback Rule
+
+Leaving `output` empty creates a fallback that applies to any monitor not matched by an explicit rule:
+
+```lua
+hl.monitor({ output = "", mode = "preferred", position = "auto", scale = 1 })
+```
+
+This automatically places any unspecified monitor to the right of the others at its preferred resolution.
+
+---
+
+## Output Selection
+
+Hyprland can identify a monitor by its **port name** or by a **description prefix** using `desc:`. You can find both values in the output of `hyprctl monitors`.
+
+<Tabs>
+<Tab title="By Port Name">
+```lua
+hl.monitor({
+    output = "eDP-1",
+    mode = "preferred",
+    position = "auto",
+})
+```
+</Tab>
+<Tab title="By Description">
+```lua
+hl.monitor({
+    output = "desc:Chimei Innolux Corporation 0x150C",
+    mode = "preferred",
+    position = "auto",
+})
+```
+</Tab>
+</Tabs>
+
+A `hyprctl monitors` output looks like:
+
+```
+Monitor eDP-1 (ID 0):
+        1920x1080@60.00100 at 0x0
+        description: Chimei Innolux Corporation 0x150C
+        ...
+```
+
+---
+
+## Modes
+
+A monitor mode is a combination of resolution and refresh rate. Run `hyprctl monitors` and check the `availableModes` field to see what your display supports.
+
+### Predefined Modes
+
+| Mode | Description |
+| --- | --- |
+| `preferred` | Use the display's preferred size and refresh rate |
+| `highres` | Use the highest supported resolution |
+| `highrr` | Use the highest supported refresh rate |
+| `maxwidth` | Use the widest supported resolution |
+
+<Note>
+Predefined modes cannot be combined — only one can be selected at a time.
+</Note>
+
+### Custom Resolution
+
+Specify resolution and refresh rate directly:
+
+```lua
+hl.monitor({ output = "DP-1", mode = "2560x1440@165" })
+```
+
+### Custom Modelines
+
+For advanced display control you can supply a full CVT/XFree86 modeline string:
+
+```lua
+hl.monitor({
+    output = "DP-1",
+    mode = "modeline 1071.101 3840 3848 3880 3920 2160 2263 2271 2277 +hsync -vsync",
+})
+```
+
+### Mirrored Displays
+
+Mirror one output onto another with the `mirror` field:
+
+```lua
+hl.monitor({ output = "DP-3", mode = "1920x1080@60", position = "0x0", scale = 1, mirror = "DP-2" })
+
+-- Fallback mirror: any unspecified monitor mirrors DP-1
+hl.monitor({ output = "", mode = "preferred", position = "auto", scale = 1, mirror = "DP-1" })
+```
+
+<Warning>
+Mirroring does not re-render at the target resolution. If mirroring a 1080p screen onto a 4K display, the 4K display still shows 1080p content. Aspect ratio differences will cause stretching.
+</Warning>
+
+### VRR (Adaptive Sync)
+
+Configure VRR per-display with the `vrr` field:
+
+| Value | Behaviour |
+| --- | --- |
+| `-1` | Follow global `misc.vrr` setting |
+| `0` | Off |
+| `1` | On |
+| `2` | Fullscreen only |
+| `3` | Fullscreen with `video` or `game` content type |
+
+```lua
+hl.monitor({ output = "DP-1", vrr = 3 })
+```
+
+---
+
+## Positioning
+
+The position is calculated in **logical pixels** (resolution ÷ scale). For a 4K monitor at scale 2, logical size is 1920×1080, so you would use position `1920x0` to place the next monitor to its right.
+
+### Predefined Position Values
+
+| Value | Description |
+| --- | --- |
+| `auto` | Place to the right of existing monitors |
+| `auto-right` / `auto-left` | Place to the right or left |
+| `auto-up` / `auto-down` | Place above or below |
+| `auto-center-right` / `auto-center-left` | Position based on monitor centers |
+
+### Manual Positioning
+
+```lua
+-- DP-1 on the left, DP-2 on the right
+hl.monitor({ output = "DP-1", mode = "1920x1080@120Hz", position = "0x0",    scale = 1 })
+hl.monitor({ output = "DP-2", mode = "1920x1080@120Hz", position = "1920x0", scale = 1 })
+
+-- DP-2 above DP-1
+hl.monitor({ output = "DP-1", mode = "1920x1080@120Hz", position = "0x0",     scale = 1 })
+hl.monitor({ output = "DP-2", mode = "1920x1080@120Hz", position = "0x-1080", scale = 1 })
+```
+
+Negative values are valid. The position `"-1920x0"` places the monitor to the left of origin.
+
+<Warning>
+No monitors may overlap. Overlapping configurations will raise a warning and not be registered.
+</Warning>
+
+### Scale and Valid Pixel Alignment
+
+A scale must divide the resolution cleanly (without decimals) to avoid invalid scale warnings:
+
+- `1920×1080 / 1.5 = 1280×720` → valid
+- `1920×1080 / 1.4 = 1371.4…` → invalid
+
+### Rotation
+
+Use the `transform` field to rotate a monitor:
+
+| Value | Transform |
+| --- | --- |
+| `0` | Normal (no transform) |
+| `1` | 90° |
+| `2` | 180° |
+| `3` | 270° |
+| `4` | Flipped |
+| `5` | Flipped + 90° |
+| `6` | Flipped + 180° |
+| `7` | Flipped + 270° |
+
+```lua
+hl.monitor({ output = "eDP-1", mode = "2880x1800@90", position = "0x0", scale = 1, transform = 1 })
+```
+
+---
+
+## Disabling a Monitor
+
+Set `disabled = true` to remove a monitor from the layout. All windows and workspaces on it will be moved to remaining monitors.
+
+```lua
+hl.monitor({ output = "HDMI-A-1", disabled = true })
+```
+
+<Warning>
+Disabling is different from DPMS. To blank a monitor without removing it from the layout (like a screensaver), use the `dpms` dispatcher instead.
+</Warning>
+
+---
+
+## Custom Reserved Area
+
+A reserved area keeps space unoccupied by tiled windows — useful when you run a bar or dock without a Wayland layer protocol reservation:
+
+```lua
+-- Reserve 10px on all sides
+hl.monitor({ output = "DP-1", reserved_area = 10 })
+
+-- Reserve only top and bottom
+hl.monitor({ output = "DP-1", reserved_area = { top = 30, bottom = 0, left = 0, right = 0 } })
+```
+
+---
+
+## Color Management and HDR
+
+### Color Management Presets
+
+Change the output color space with the `cm` field:
+
+| Preset | Description |
+| --- | --- |
+| `auto` | `srgb` for 8bpc, `wide` for 10bpc if supported (**recommended**) |
+| `srgb` | sRGB primaries (default) |
+| `dcip3` | DCI P3 primaries |
+| `dp3` | Apple P3 primaries |
+| `adobe` | Adobe RGB primaries |
+| `wide` | Wide color gamut, BT.2020 primaries |
+| `edid` | Primaries from EDID (known to be inaccurate) |
+| `hdr` | Wide color gamut + HDR PQ transfer function |
+| `hdredid` | Same as `hdr` with EDID primaries |
+
+```lua
+hl.monitor({ output = "eDP-1", cm = "wide" })
+```
+
+### SDR Brightness and Saturation in HDR Mode
+
+```lua
+hl.monitor({
+    output   = "eDP-1",
+    cm       = "hdr",
+    sdrbrightness  = 1.2,
+    sdrsaturation  = 0.98,
+})
+```
+
+Typical `sdrbrightness` values fall in the `1.0 – 2.0` range.
+
+### 10-Bit Color
+
+```lua
+hl.monitor({ output = "DP-1", bitdepth = 10 })
+```
+
+<Warning>
+Some monitors claim 10-bit support but use 8-bit + FRC dithering. This may cause eye strain. Additionally, some applications do not support screen capture with 10-bit enabled.
+</Warning>
+
+### ICC Profiles
+
+Load an ICC profile via the `icc` field. The path must be absolute:
+
+```lua
+hl.monitor({ output = "DP-1", icc = "/path/to/icc.icm" })
+```
+
+<Note>
+An applied ICC profile automatically forces `sdr_eotf` to sRGB for color accuracy, overrides the CM preset, and is fundamentally incompatible with HDR gaming.
+</Note>
+
+---
+
+## Binding Workspaces to Monitors
+
+Use [Workspace Rules](/configuring/rules#workspace-rules) to pin workspaces to specific monitors:
+
+```lua
+hl.workspace_rule({ workspace = "name:coding", monitor = "DP-1", default = true })
+hl.workspace_rule({ workspace = "name:gaming", monitor = "desc:Chimei Innolux Corporation 0x150C", default = true })
+```

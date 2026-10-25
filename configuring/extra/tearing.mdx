@@ -1,0 +1,91 @@
+---
+title: "Screen Tearing in Hyprland: Setup, Windowrules, and Caveats"
+sidebarTitle: Tearing
+description: Enable screen tearing in Hyprland to reduce input latency in games using allow_tearing, the immediate windowrule, and fullscreen-only restrictions.
+---
+
+Screen tearing is a technique that allows the GPU to push frames to the display without waiting for the monitor's vertical blank interval. This eliminates the frame-pacing overhead of vsync and reduces end-to-end input latency — which is why many gamers prefer it for competitive titles. In Hyprland, tearing support is opt-in and currently experimental.
+
+<Warning>
+  Tearing support is experimental. If you experience graphical issues such as frozen frames or coloured pixel artefacts, your GPU driver likely does not support tearing on Wayland. See the [Common Issues](#common-issues) section below.
+</Warning>
+
+## Enabling Tearing
+
+Enabling tearing requires two steps: a master toggle in your config, and a windowrule on the specific application you want to tear.
+
+<Steps>
+  <Step title="Enable the master toggle">
+    Set `general.allow_tearing` to `true` in your Hyprland config:
+
+    ```lua
+    hl.config({
+      general = {
+        allow_tearing = true
+      }
+    })
+    ```
+  </Step>
+  <Step title="Add an immediate windowrule to your game">
+    Apply the `immediate` windowrule effect to the window class of your game. This tells Hyprland to allow that specific window to tear:
+
+    ```lua
+    hl.window_rule({
+      match = { class = "cs2" }, immediate = true
+    })
+    ```
+
+    Replace `cs2` with the actual window class of your game. You can find the class name by running `hyprctl clients` while the game is open.
+  </Step>
+</Steps>
+
+<Note>
+  Tearing will only take effect when the game window is **fullscreen** and is the **only visible thing on that monitor** — no notifications, overlays, lock screens, status bars, or other windows. Elements on a different monitor are fine.
+
+  Check the `tearingBlockedBy` field in `hyprctl monitors` output to see what is currently preventing tearing if it is not working as expected.
+</Note>
+
+## Full Example
+
+```lua
+hl.config({
+  general = {
+    allow_tearing = true
+  }
+})
+
+-- Allow cs2 to tear when fullscreen
+hl.window_rule({
+  match = { class = "cs2" }, immediate = true
+})
+```
+
+## Common Issues
+
+<Accordion title="No tearing at all">
+  Check the following:
+
+  - `general.allow_tearing` is set to `true`.
+  - The windowrule for your game matches the correct window class (verify with `hyprctl clients`).
+  - Nothing else is visible on the monitor where the game is running — no status bar, notification, or other window.
+
+  The `tearingBlockedBy` field in `hyprctl monitors` will tell you exactly what is blocking tearing.
+</Accordion>
+
+<Accordion title="Apps that should tear are freezing instead">
+  This almost certainly means your GPU driver does not support tearing on Wayland. There is no workaround; this is a driver limitation.
+
+  Please **do not** report this as a Hyprland bug.
+</Accordion>
+
+<Accordion title="Graphical artefacts (random coloured pixels, corruption)">
+  This is a GPU driver issue, not a Hyprland bug. It most commonly affects older NVIDIA drivers or open-source drivers with incomplete DRM plane support.
+
+  Please **do not** report this as a Hyprland bug.
+</Accordion>
+
+## VRR Interaction
+
+VRR (Variable Refresh Rate / Adaptive Sync) and tearing are separate mechanisms. VRR dynamically adjusts the monitor's refresh rate to match the game's frame rate, reducing tearing without the latency overhead of traditional vsync. Tearing bypasses vsync entirely and is most beneficial when frames are produced faster than the display's maximum refresh rate.
+
+When both `allow_tearing` and VRR are enabled, Hyprland will prefer VRR when the frame rate is within the monitor's VRR range, and fall back to tearing when it exceeds the maximum refresh rate.

@@ -1,0 +1,123 @@
+---
+title: "Dwindle Layout: Binary-Tree Window Tiling in Hyprland"
+sidebarTitle: Dwindle
+description: "Configure Hyprland's Dwindle layout — a BSPWM-style binary tree engine with pseudotiling, smart splits, adjustable ratios, and per-direction overrides."
+---
+
+Dwindle is a BSPWM-inspired layout where every window on a workspace is a member of a binary tree. When a new window opens, it splits the currently focused window — either side-by-side or top-and-bottom — and the two children each occupy half of the parent's area. The result is a recursive, space-filling tile arrangement that grows naturally as windows are added.
+
+## How Splits Work
+
+Dwindle determines split direction **dynamically** based on the width-to-height ratio of the parent node at the time the split occurs. If the parent is wider than it is tall, the split is horizontal (side-by-side). If it is taller than it is wide, the split is vertical (top-and-bottom).
+
+<Note>
+  Splits are **not permanent** by default. Resizing a node can change its W/H ratio and therefore flip the split direction of future children. Enable `preserve_split` or `smart_split` to lock split directions in place.
+</Note>
+
+## Config
+
+All options below belong to the `dwindle` configuration category.
+
+| Name | Description | Type | Default | Limits |
+| --- | --- | --- | --- | --- |
+| `force_split` | `0` — split follows mouse position; `1` — always split left/top (new window on left or top); `2` — always split right/bottom (new window on right or bottom) | int | `0` | 0–2 |
+| `preserve_split` | When enabled, the split direction (side/top) is locked and will not change regardless of what happens to the container | bool | `false` | |
+| `smart_split` | Enables precise split-direction control based on cursor position within the window. The window is divided into four triangles; the cursor's triangle determines the split. Also enables `preserve_split` automatically | bool | `false` | |
+| `smart_resizing` | When enabled, the resize direction is determined by the mouse's proximity to a corner. When disabled, it is based on the window's tiling position | bool | `true` | |
+| `permanent_direction_override` | When enabled, the preselect direction persists until this mode is turned off, a new direction is specified, or a non-direction argument is used | bool | `false` | |
+| `special_scale_factor` | Scales windows on the special workspace by this factor | float | `1.0` | 0.0–1.0 |
+| `split_width_multiplier` | Multiplier applied to window width when determining auto-split direction. Useful on ultrawide monitors where W > H even after many splits | float | `1.0` | 0.1–3.0 |
+| `use_active_for_splits` | Prefer the active window (rather than mouse cursor position) when deciding where to split | bool | `true` | |
+| `default_split_ratio` | The split ratio applied when a new window opens. `1.0` means an even 50/50 split | float | `1.0` | 0.1–1.9 |
+| `split_bias` | Determines which child receives the split ratio: `0` — directional (top or left window); `1` — the current window | int | `0` | 0–1 |
+| `precise_mouse_move` | When dragging and dropping a window, placement is based on the exact cursor position rather than the nearest split | bool | `false` | |
+
+### Example Configuration
+
+```lua
+dwindle {
+    preserve_split    = true
+    smart_resizing    = true
+    default_split_ratio = 1.0
+    split_width_multiplier = 1.2
+}
+```
+
+## Pseudotiling
+
+Pseudotiling allows a window to retain its floating preferred size while still participating in the tiling tree. The window is visually constrained to its tile cell but renders at its natural dimensions centered within it.
+
+Toggle pseudotiling for the focused window using the `window.pseudo` dispatcher:
+
+```lua
+hl.bind("SUPER + P", hl.dsp.window.pseudo())
+```
+
+The dispatcher accepts an optional window selector. Leave it empty or use `"active"` to target the focused window, or pass `"window"` followed by a selector to target a specific window.
+
+## Dispatchers
+
+The following dispatcher is specific to the Dwindle layout and operates on the `window` namespace:
+
+| Dispatcher | Description | Params |
+| --- | --- | --- |
+| `window.pseudo` | Toggles pseudotiling on the target window | Empty / `"active"` for current window; `"window"` for a specific window |
+
+## Layout Messages
+
+Layout messages are sent via `hl.dsp.layout()`. The following arguments are supported in Dwindle:
+
+| Param | Description | Args |
+| --- | --- | --- |
+| `movetoroot` | Moves the window to the root of the workspace binary tree | `window?`, `"unstable"?` |
+| `preselect` | One-time override for the split direction on the next window opened (tiled only) | direction |
+| `rotatesplit` | Rotates the split of the current window by an angle (must be a multiple of 90). Positive = clockwise, negative = counter-clockwise | `int?` (default: `90`) |
+| `splitratio` | Changes the split ratio by a delta, or sets it exactly with `exact` | float |
+| `swapsplit` | Swaps the two halves of the current window's split | none |
+| `togglesplit` | Toggles the split direction (top/side). Requires `preserve_split = true` | none |
+
+### `movetoroot` Details
+
+`movetoroot` makes the specified window a direct child of the workspace's root node. If the window is already a direct root child, a warning is produced instead.
+
+By default the behavior is **stable** — the focused window stays on the same side of the screen. Pass `"unstable"` as a second argument to swap the positions of the root node's immediate children instead.
+
+<Warning>
+  `movetoroot unstable` is **not** a valid call. The correct form is `movetoroot active unstable`.
+</Warning>
+
+### `splitratio` Details
+
+`splitratio` operates on a delta by default. Prefix the value with `+` or `-` to set direction explicitly. Append `exact` after the value to set an absolute ratio instead of a delta. Values outside `[0.1, 1.9]` are clamped.
+
+### Example Key Bindings
+
+```lua
+-- Move the active window to the root of the tree
+hl.bind("SUPER + A", hl.dsp.layout("movetoroot active"))
+
+-- Move a specific window class to root, with unstable swap
+hl.bind("SUPER + A", hl.dsp.layout("movetoroot class:imcool unstable"))
+
+-- Toggle the split direction of the current window
+hl.bind("SUPER + T", hl.dsp.layout("togglesplit"))
+
+-- Set split ratio to an exact value of 1.2
+hl.bind("SUPER + equal", hl.dsp.layout("splitratio 1.2 exact"))
+
+-- Decrease split ratio by 0.4 (relative delta)
+hl.bind("SUPER + minus", hl.dsp.layout("splitratio -0.4"))
+
+-- Pre-select the next split direction
+hl.bind("SUPER + Right", hl.dsp.layout("preselect r"))
+```
+
+## Special Workspace Behavior
+
+Windows on the special workspace are scaled by `special_scale_factor`. Setting this below `1.0` adds padding around special workspace windows, making them easier to distinguish from the regular workspace content beneath.
+
+```lua
+dwindle {
+    special_scale_factor = 0.8
+}
+```

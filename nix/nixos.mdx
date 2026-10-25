@@ -1,0 +1,184 @@
+---
+title: "Installing and Configuring Hyprland on NixOS Systems"
+sidebarTitle: NixOS
+description: Enable Hyprland on NixOS via the module system, choose between stable Nixpkgs and the upstream flake, and set up the Cachix binary cache.
+---
+
+NixOS is the most fully supported platform for running Hyprland through Nix. The NixOS module handles session registration, the XDG desktop portal, and all required system-level integration automatically — you simply enable a flag and rebuild. This page walks through stable Nixpkgs, the upstream flake, flake-compat, the Cachix binary cache, and the available configuration methods.
+
+## Installing Hyprland
+
+You can install Hyprland from three sources: the stable Nixpkgs repository, the upstream Hyprland flake (for the latest git commit), or flake-compat (for using the flake without enabling flakes system-wide).
+
+<Tabs>
+  <Tab title="Nixpkgs (Stable)">
+    The simplest option. This installs the Hyprland version bundled with your current Nixpkgs channel.
+
+    ```nix
+    # configuration.nix
+    {
+      programs.hyprland.enable = true;
+    }
+    ```
+
+    This single line enables Hyprland, registers the Wayland session file, and brings in `xdg-desktop-portal-hyprland`.
+  </Tab>
+  <Tab title="Hyprland Flake">
+    Use this to track the latest development version of Hyprland.
+
+    <Note>
+      If you don't want to compile Hyprland yourself, make sure to enable the [Cachix binary cache](#cachix-binary-cache) before switching to this configuration.
+    </Note>
+
+    First, add the Hyprland flake as an input:
+
+    ```nix
+    # flake.nix
+    {
+      inputs.hyprland.url = "github:hyprwm/Hyprland";
+
+      outputs = { nixpkgs, ... } @ inputs: {
+        nixosConfigurations.HOSTNAME = nixpkgs.lib.nixosSystem {
+          specialArgs = { inherit inputs; }; # this is the important part
+          modules = [
+            ./configuration.nix
+          ];
+        };
+      };
+    }
+    ```
+
+    Replace `HOSTNAME` with your actual hostname. Then reference the flake package in your configuration:
+
+    ```nix
+    # configuration.nix
+    { inputs, pkgs, ... }: {
+      programs.hyprland = {
+        enable = true;
+        # set the flake package
+        package = inputs.hyprland.packages.${pkgs.stdenv.hostPlatform.system}.hyprland;
+        # make sure to also set the portal package, so that they are in sync
+        portalPackage = inputs.hyprland.packages.${pkgs.stdenv.hostPlatform.system}.xdg-desktop-portal-hyprland;
+      };
+    }
+    ```
+
+    <Warning>
+      If you experience lag and FPS drops in games or Blender on **stable** NixOS when using the Hyprland flake, this is most likely a `mesa` version mismatch. Fix it by using `mesa` from Hyprland's `nixpkgs` input:
+
+      ```nix
+      # configuration.nix
+      { pkgs, inputs, ... }: let
+        pkgs-unstable = inputs.hyprland.inputs.nixpkgs.legacyPackages.${pkgs.stdenv.hostPlatform.system};
+      in {
+        hardware.graphics = {
+          package = pkgs-unstable.mesa;
+
+          # if you also want 32-bit support (e.g., for Steam)
+          enable32Bit = true;
+          package32 = pkgs-unstable.pkgsi686Linux.mesa;
+        };
+      }
+      ```
+
+      See [issue #5148](https://github.com/hyprwm/Hyprland/issues/5148) for details.
+    </Warning>
+  </Tab>
+  <Tab title="flake-compat">
+    Use the Hyprland flake package on a NixOS system that does not have flakes enabled.
+
+    <Note>
+      If you don't want to compile Hyprland yourself, make sure to enable the [Cachix binary cache](#cachix-binary-cache) first.
+    </Note>
+
+    ```nix
+    # configuration.nix
+    { pkgs, ... }: let
+      flake-compat = builtins.fetchTarball "https://github.com/edolstra/flake-compat/archive/master.tar.gz";
+
+      hyprland = (import flake-compat {
+        src = builtins.fetchTarball "https://github.com/hyprwm/Hyprland/archive/main.tar.gz";
+      }).defaultNix;
+    in {
+      programs.hyprland = {
+        enable = true;
+        package = hyprland.packages.${pkgs.stdenv.hostPlatform.system}.hyprland;
+        portalPackage = hyprland.packages.${pkgs.stdenv.hostPlatform.system}.xdg-desktop-portal-hyprland;
+      };
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Cachix Binary Cache
+
+The Hyprland flake is not built by Hydra and therefore is not cached on `cache.nixos.org`. Without a binary cache, building Hyprland from the flake will compile `mesa`, `ffmpeg`, and other heavy dependencies on your machine.
+
+<Warning>
+  The cache must be configured **before** you first use the Hyprland flake package. Add it to your configuration and rebuild before switching to the flake.
+
+  Do **not** override Hyprland's `nixpkgs` input unless you know what you are doing — doing so will render the cache useless.
+</Warning>
+
+Add the [Hyprland Cachix](https://app.cachix.org/cache/hyprland) to your NixOS configuration:
+
+```nix
+# configuration.nix
+{
+  nix.settings = {
+    substituters = ["https://hyprland.cachix.org"];
+    trusted-substituters = ["https://hyprland.cachix.org"];
+    trusted-public-keys = ["hyprland.cachix.org-1:a7pgxzMz7+chwVL3/pzj6jIBMioiJM7ypFP8PwtkuGc="];
+    # Required so non-root users are allowed to use the above substituter/keys.
+    # Use @wheel for all sudo users, or list your username explicitly.
+    trusted-users = ["root" "@wheel"];
+  };
+}
+```
+
+<Note>
+  If you see `ignoring the client-specified setting 'trusted-public-keys', because it is a restricted setting and you are not a trusted user`, your user is missing from `trusted-users`. Add it as shown above and rebuild.
+
+  This page only applies to the flake package. You can safely skip Cachix if you use the Nixpkgs package.
+</Note>
+
+## Configuring Hyprland on NixOS
+
+After enabling Hyprland, you can configure it either imperatively (by placing `hyprland.lua` in `~/.config/hypr/`) or declaratively using one of the two tools below.
+
+### Hjem
+
+Hjem is a simple, lightweight home management tool designed for linking files into your home directory and managing systemd units and environment variables at the user level. It is a streamlined alternative to Home Manager.
+
+Write your `hyprland.lua` content directly inside your Nix configuration with full Nix string interpolation:
+
+```nix
+# hyprland.nix
+{
+  hjem.users.youruser.xdg.config.files."hypr/hyprland.lua".text = /* lua */ ''
+    # Your hyprland.lua content goes here.
+    # You can use Nix string interpolation for variables evaluated at build time.
+  '';
+}
+```
+
+Or link an existing file:
+
+```nix
+# hyprland.nix
+{
+  hjem.users.youruser.xdg.config.files."hypr/hyprland.lua".source = ./relative/path/to/hyprland.lua;
+}
+```
+
+See the [Hjem documentation](https://hjem.feel-co.org/) for installation and full usage instructions.
+
+### Home Manager
+
+Home Manager is a popular tool for managing your home directory declaratively with Nix. It provides a dedicated `wayland.windowManager.hyprland` module with many options.
+
+See the [Home Manager page](/nix/home-manager) for the full configuration guide, plugin management, and FAQ.
+
+### Advanced Options
+
+The [Advanced](/nix/nixos) page covers package overlays, build overrides (`enableXWayland`, `withSystemd`), building custom plugins with `mkHyprlandPlugin`, and using Nix repl for quick experiments.

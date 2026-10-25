@@ -1,0 +1,436 @@
+---
+title: "Recommended Wayland Utilities for Hyprland"
+sidebarTitle: "Useful Utilities"
+description: "Community-curated Wayland utilities for Hyprland: status bars, wallpapers, launchers, clipboard managers, screen sharing, phone tools, and more."
+---
+
+Hyprland is a compositor, not a full desktop environment, which means certain pieces of the desktop — notifications, screen sharing, file pickers, wallpapers — must be assembled from individual tools. This page collects the most widely used and recommended community utilities organised by category, with brief descriptions to help you pick the right tool for each job.
+
+<Note>
+  Tools marked as first-party are developed and maintained by the Hyprland team under the [hyprwm GitHub organisation](https://github.com/hyprwm). Community tools are linked to their respective repositories for installation instructions.
+</Note>
+
+<Accordion title="Must-Have Essentials">
+  These components are **strongly** recommended for a smooth Hyprland experience. Desktop environments handle them automatically; on Hyprland you assemble them yourself.
+
+  **Notification daemon**
+
+  Start automatically via D-Bus activation, or via an autostart entry in `hyprland.lua`. Many apps (e.g., Discord) may freeze without one running.
+
+  - [`dunst`](https://dunst-project.org/) — lightweight, highly configurable
+  - [`mako`](https://github.com/emersion/mako) — minimal Wayland notification daemon
+  - [`fnott`](https://codeberg.org/dnkl/fnott) — keyboard-driven, plain-text notifications
+  - [`swaync`](https://github.com/ErikReider/SwayNotificationCenter) — notification center with a panel UI
+
+  **PipeWire**
+
+  Required for screen sharing. Install `pipewire` and `wireplumber` (not `pipewire-media-session`). On non-systemd distributions, use your distro's dedicated launcher (e.g., `whereis <distro>-pipewire-launcher`).
+
+  **XDG Desktop Portal**
+
+  Handles file pickers, screen sharing, and more. See [xdg-desktop-portal-hyprland](ecosystem/user-apps#xdg-desktop-portal-hyprland) for the Hyprland-specific implementation.
+
+  **Authentication Agent**
+
+  Required for GUI apps to request elevated privileges. See [hyprpolkitagent](ecosystem/user-apps#hyprpolkitagent). Alternative: [KDE's polkit agent](https://github.com/KDE/polkit-kde-agent-1/).
+
+  **Qt Wayland support**
+
+  Install `qt5-wayland` and `qt6-wayland` so Qt applications render natively on Wayland rather than falling back to XWayland.
+
+  **Fonts**
+
+  A `sans-serif` font (e.g., `noto-fonts`) is required to render text. Install a Nerd Font or FontAwesome for icon glyphs in status bars and launchers.
+</Accordion>
+
+<Accordion title="Status Bars">
+  Status bars display workspace indicators, system stats, clocks, and more. Choose a simple bar for quick setup or a widget system for full customisation.
+
+  **Simple status bars**
+
+  - [**Waybar**](https://github.com/Alexays/Waybar) — GTK bar built for wlroots compositors with native Hyprland support. Replace `sway/workspaces` with `hyprland/workspaces` and `sway/mode` with `hyprland/submap` in your config. Provides a systemd service; enable with `systemctl --user enable --now waybar.service` when using uwsm.
+
+    ```json
+    "hyprland/workspaces": {
+      "format": "{icon}",
+      "on-scroll-up": "hyprctl dispatch 'hl.dsp.focus({workspace=\"e+1\"})'",
+      "on-scroll-down": "hyprctl dispatch 'hl.dsp.focus({workspace=\"e-1\"})'",
+    }
+    ```
+
+  - [**ashell**](https://malpenzibo.github.io/ashell/) — ready-to-use Wayland bar for Hyprland built with Rust/iced. Works out of the box with workspaces, time, battery, and network modules. Limited configuration options by design.
+
+  **Desktop shells**
+
+  Full DE-like experiences that bundle a bar, launcher, notifications, and lock screen:
+
+  - [**Noctalia**](https://noctalia.dev/) — minimal, beautiful shell built on Quickshell with wallpaper-based color generation, notification history, Do Not Disturb, and plugin support.
+  - [**DankMaterialShell**](https://danklinux.com/) — Material 3-inspired shell built on Quickshell and Go. Ships a bar, launcher, notification center, control center, and lock screen with automatic wallpaper-based theming and a built-in settings GUI.
+
+  **Widget systems**
+
+  Write custom layouts with code; frameworks handle rendering and Wayland integration:
+
+  | | [AGS/Astal](https://aylur.github.io/astal/) | [EWW](https://elkowar.github.io/eww/) | [Quickshell](https://quickshell.outfoxxed.me/) |
+  |---|---|---|---|
+  | UI toolkit | GTK 3/4 | GTK 3 | Qt |
+  | Config language | JS(X)/TS/GObject langs | Yuck (Lisp-like) | QML |
+
+  - **AGS/Astal** — framework for GTK desktop shells; AGS adds TypeScript/JSX scaffolding. Large library set including Network and Bluetooth services.
+  - **EWW** — Rust + GTK widget system, compositor-independent. SCSS styling out of the box. Read [the Wayland section](https://elkowar.github.io/eww/configuration.html#wayland) carefully.
+  - **Quickshell** — QtQuick-based shell toolkit with live config reload, advanced Hyprland integrations (live window previews), and automatic config reloading. Still in alpha.
+
+  <Tip>
+    Add blur to any bar layer with Hyprland layer rules: `blur` enables blur and `ignore_alpha` prevents it from blending with transparent regions.
+  </Tip>
+</Accordion>
+
+<Accordion title="Wallpapers">
+  Launch your wallpaper utility from Hyprland's autostart section in `hyprland.lua`.
+
+  - [**hyprpaper**](https://github.com/hyprwm/hyprpaper) *(first-party)* — fast, IPC-controlled wallpaper daemon with per-monitor support, fit modes, and live changes via `hyprctl hyprpaper`. See the full [hyprpaper docs](ecosystem/user-apps#hyprpaper).
+
+  - [**swaybg**](https://github.com/swaywm/swaybg) — simple static wallpaper setter. Ideal if you only need one wallpaper and no live switching.
+
+  - [**wpaperd**](https://github.com/danyspin97/wpaperd) — slightly more advanced daemon with automatic timed wallpaper rotation and per-monitor configuration.
+
+  - [**mpvpaper**](https://github.com/GhostNaN/mpvpaper) — wraps `mpv` to play a video as your wallpaper.
+
+    <Tip>
+      Use [mpvpaper-stop](https://github.com/pvtoari/mpvpaper-stop) to pause the video wallpaper when it is in the background, saving CPU and battery.
+    </Tip>
+
+  - [**awww**](https://codeberg.org/LGFae/awww) — efficient animated wallpaper daemon for Wayland with runtime control; change wallpapers without restarting.
+
+  - [**waypaper**](https://github.com/anufrievroman/waypaper) — GUI wallpaper manager for visually browsing and setting static or animated wallpapers; supports `swaybg` and `awww` as backends.
+
+  - [**wallrizz**](https://github.com/5hubham5ingh/WallRizz) — TUI wallpaper manager; supports `awww`, `hyprpaper`, and other backends.
+</Accordion>
+
+<Accordion title="Screenshots and Recording">
+  All screenshot and recording tools on Wayland interact with the compositor through PipeWire and the XDG Desktop Portal. Ensure `xdg-desktop-portal-hyprland` is running before using portal-based capture.
+
+  **Screenshot utilities**
+
+  - [**grim**](https://gitlab.freedesktop.org/emersion/grim) — simple Wayland screenshot tool; commonly combined with [`slurp`](https://github.com/emersion/slurp) for region selection and [`swappy`](https://github.com/jtheoof/swappy) for annotations.
+
+    ```lua
+    -- Select area and open in swappy
+    hl.bind("Print", hl.dsp.exec_cmd('grim -g "$(slurp)" - | swappy -f -'))
+    -- Copy selected area to clipboard
+    hl.bind("SUPER + Print", hl.dsp.exec_cmd('grim -g "$(slurp -d)" - | wl-copy'))
+    ```
+
+  - [**satty**](https://github.com/Satty-org/Satty) — modern screenshot annotation tool; near drop-in replacement for `swappy` with additional features.
+
+    ```lua
+    hl.bind("Print", hl.dsp.exec_cmd('grim - | satty -f - --copy-command wl-copy -o "~/Pictures/Screenshots/%Y%m%d_%H%M%S.png"'))
+    ```
+
+  - [**waytator**](https://github.com/faetalize/waytator) — lightweight screenshot annotator and image editor in C.
+
+  - [**flameshot**](https://github.com/flameshot-org/flameshot) — screenshot tool with a built-in annotation UI. Requires working desktop portal setup on Wayland.
+
+  - [**HyprCapture**](https://github.com/gfhdhytghd/HyprCapture) — Hyprland-oriented screenshot and recording utility integrated with the compositor.
+
+  **Recording utilities**
+
+  - [**OBS Studio**](https://obsproject.com/) — full-featured screen recorder/streamer via PipeWire and the desktop portal. Requires `pipewire`, `wireplumber`, `xdg-desktop-portal-hyprland`, and `qt6-wayland`.
+
+  - [**wf-recorder**](https://github.com/ammen99/wf-recorder) — lightweight Wayland screen recorder.
+
+    ```sh
+    wf-recorder -g "$(slurp)" -f ~/Videos/recording.mp4
+    ```
+
+  - [**wl-screenrec**](https://github.com/russelltg/wl-screenrec) — high-performance wlroots screen recorder with hardware encoding.
+
+  - [**GPU Screen Recorder**](https://git.dec05eba.com/gpu-screen-recorder/about/) — minimal-overhead recorder using only the GPU, similar to ShadowPlay on Windows.
+
+    ```sh
+    gpu-screen-recorder -w screen -f 60 -a default_output -o ~/Videos/recording.mp4
+    ```
+</Accordion>
+
+<Accordion title="App Launchers">
+  Application launchers let you search for and open apps quickly. Most support fuzzy search and can be bound to a key in your Hyprland config.
+
+  - [**hyprlauncher**](https://github.com/hyprwm/hyprlauncher) *(first-party)* — multipurpose daemon-based launcher with built-in desktop, math, Unicode, and font finders. Theming follows hyprtoolkit. See the full [hyprlauncher docs](ecosystem/user-apps#hyprlauncher).
+
+  - [**rofi**](https://github.com/davatorium/rofi) — window switcher, application launcher, and `dmenu` replacement. Native Wayland support since 2025.
+
+  - [**wofi**](https://hg.sr.ht/~scoopta/wofi) — GTK-based customisable launcher for Wayland.
+
+  - [**bemenu**](https://github.com/Cloudef/bemenu) — Wayland-native `dmenu` replacement.
+
+  - [**fuzzel**](https://codeberg.org/dnkl/fuzzel) — application launcher for wlroots compositors, similar to Rofi's `drun` mode.
+
+  - [**tofi**](https://github.com/philj56/tofi) — extremely fast, highly customisable `dmenu`/Rofi replacement; can appear within a single frame when configured correctly.
+
+  - [**anyrun**](https://github.com/anyrun-org/anyrun) — Wayland-native krunner-like runner; modular and extensible via plugins including an Applications Plugin.
+
+  - [**walker**](https://github.com/abenz1267/walker) — extensible Wayland runner with built-in modules for apps, runner, Hyprland windows, and web search; supports service mode for fast startups.
+
+  - [**vicinae**](https://github.com/vicinaehq/vicinae) — C++ and Qt native launcher with Raycast extension compatibility and many built-in modules.
+
+  <Info>
+    For a more comprehensive list see [awesome-hyprland: runners, menus and application launchers](https://github.com/hyprland-community/awesome-hyprland#runners-menus-and-application-launchers).
+  </Info>
+</Accordion>
+
+<Accordion title="File Managers">
+  Hyprland does not include a file manager. Pick one based on whether you prefer a graphical or terminal-based workflow.
+
+  **GUI file managers**
+
+  - [**dolphin**](https://github.com/KDE/dolphin) — full-featured file manager by KDE with split views, tabs, and plugins.
+  - [**nautilus**](https://apps.gnome.org/Nautilus/) — GNOME's Files app. Extensions: `nautilus-admin-gtk4` (elevated privileges), `nautilus-image-converter`, `nautilus-open-any-terminal`.
+  - [**nemo**](https://github.com/linuxmint/nemo) — Cinnamon's file manager. Extensions: `nemo-fileroller` (archives), `nemo-terminal` (embedded terminal).
+  - [**pcmanfm-qt**](https://github.com/lxqt/pcmanfm-qt) — lightweight Qt-based file manager by LXQt.
+  - [**thunar**](https://gitlab.xfce.org/xfce/thunar) — XFCE's fast, extensible file manager.
+
+  **TUI file managers**
+
+  - [**yazi**](https://yazi-rs.github.io/) — blazing fast async-I/O file manager written in Rust with image previews and plugin support.
+  - [**lf**](https://github.com/gokcehan/lf) — Go-based file manager inspired by ranger with a minimal footprint.
+  - [**ranger**](https://github.com/ranger/ranger) — Vim-inspired console file manager with a three-column layout.
+  - [**nnn**](https://github.com/jarun/nnn) — unorthodox terminal file manager focused on speed and portability.
+  - [**superfile**](https://github.com/yorukot/superfile) — modern terminal file manager with a polished TUI.
+</Accordion>
+
+<Accordion title="Clipboard Managers">
+  Start clipboard managers from your Hyprland config's autostart section. Most require `wl-clipboard` (`wl-paste` / `wl-copy`) to interact with the Wayland clipboard.
+
+  - [**cliphist**](https://github.com/sentriz/cliphist) — stores text, images, and binary data. Pair with `wl-paste --watch cliphist store`. Display with rofi, wofi, fuzzel, or dmenu.
+
+    ```sh
+    # Autostart in hyprland.lua
+    wl-paste --type text --watch cliphist store
+    wl-paste --type image --watch cliphist store
+    # Bind to key (rofi example)
+    cliphist list | rofi -dmenu -display-columns 2 | cliphist decode | wl-copy
+    ```
+
+  - [**clipvault**](https://github.com/rolv-apneseth/clipvault) — alternative to cliphist with max-age, min/max entry length, and multi-format support.
+
+  - [**clipse**](https://github.com/savedra1/clipse) — TUI clipboard manager with image/text previews, multi-select, pinned items, auto-paste, and custom themes. Bind to a floating terminal window.
+
+    ```lua
+    hl.bind("SUPER + V", hl.dsp.exec_cmd("kitty --class clipse -e clipse",
+        { float = true, size = {622, 652}, stay_focused = true }))
+    ```
+
+  - [**clipman**](https://github.com/chmouel/clipman) — text-only Wayland clipboard manager using `wl-clipboard`.
+
+  - [**copyq**](https://github.com/hluk/CopyQ) — feature-rich manager with tabs, scripting, cross-device sync, and a searchable history UI. Start with `copyq --start-server`.
+
+  - [**wl-clip-persist**](https://github.com/Linus789/wl-clip-persist) — keeps clipboard contents alive after the source application closes. Add `wl-clip-persist --clipboard regular` to autostarts.
+
+  - [**cursor-clip**](https://github.com/Sirulex/cursor-clip) — GTK4/Libadwaita clipboard manager that opens at the cursor position; Windows 11-style history interface. Start with `cursor-clip --daemon`.
+</Accordion>
+
+<Accordion title="Color Pickers">
+  Color pickers let you sample any pixel on your screen and output its value in a chosen format. On Wayland, most X11-based pickers do not work; the tools below are Wayland-native.
+
+  - [**hyprpicker**](https://github.com/hyprwm/hyprpicker) *(first-party)* — the recommended color picker for Hyprland. Freezes the screen, shows a zoom lens, and outputs the picked color in your chosen format (`hex`, `rgb`, `hsl`, `hsv`, `cmyk`). Supports auto-copy to clipboard and desktop notifications. See the full [hyprpicker docs](ecosystem/user-apps#hyprpicker).
+
+    ```sh
+    # Pick a color, copy lowercase hex to clipboard
+    hyprpicker --autocopy --format=hex --lowercase-hex
+    ```
+
+  <Info>
+    hyprpicker is currently the only Wayland color picker that supports fractional scaling and a live hex preview.
+  </Info>
+</Accordion>
+
+<Accordion title="App Clients">
+  Some popular applications are problematic under Wayland due to their underlying technology (Electron, WebKit). The alternatives below are native or better-adapted Wayland clients.
+
+  **Discord**
+
+  - [**WebCord**](https://github.com/SpacingBat3/WebCord) — Discord client on latest Electron with Wayland Ozone platform and PipeWire screen sharing. Does not infringe Discord ToS.
+  - [**Vesktop**](https://github.com/Vencord/Vesktop) — custom Discord client with improved performance, built-in screen sharing with audio, and Vencord plugin support. Built on Vencord which violates Discord ToS — use at your own risk.
+  - [**Dissent**](https://github.com/diamondburned/dissent) — Discord client written in GTK4; avoids webview technologies. Violates Discord ToS but is relatively safe.
+
+  **Matrix / Element**
+
+  - [**Fractal**](https://wiki.gnome.org/Apps/Fractal) — Matrix client written in GTK4 with E2EE, cross-device verification, and a native Wayland UI. Does not yet support VoIP calling.
+</Accordion>
+
+<Accordion title="Screen Sharing">
+  Screen sharing on Wayland goes through PipeWire. Ensure `pipewire`, `wireplumber`, and `xdg-desktop-portal-hyprland` are installed and running before testing.
+
+  **Prerequisites**
+
+  1. Install and enable `pipewire` and `wireplumber`.
+  2. Install `xdg-desktop-portal-hyprland` — see [the XDPH docs](ecosystem/user-apps#xdg-desktop-portal-hyprland).
+  3. Ensure `bitdepth` in your monitor config matches the physical monitor.
+
+  **Setup guide**
+
+  Read [this gist by Bruno Ancona Sala](https://gist.github.com/brunoanc/2dea6ddf6974ba4e5d26c3139ffb7580) for a comprehensive walkthrough.
+
+  **Xwayland applications**
+
+  Apps running under Xwayland (Discord, Skype) can only see other Xwayland windows and cannot share a Wayland screen directly. Use [xwaylandvideobridge](https://invent.kde.org/system/xwaylandvideobridge) as a workaround. Add window rules to hide its main window:
+
+  ```lua
+  hl.window_rule({
+      name  = "xwayland-video-bridge-fixes",
+      match = { class = "xwaylandvideobridge" },
+      no_initial_focus = true,
+      no_focus  = true,
+      no_anim   = true,
+      no_blur   = true,
+      max_size  = {1, 1},
+      opacity   = 0.0,
+  })
+  ```
+</Accordion>
+
+<Accordion title="Phone Connect">
+  Tools for integrating Android or iOS phones with a Hyprland session, including notifications, file access, screen mirroring, and quick local transfers.
+
+  **Phone integration**
+
+  - [**KDE Connect**](https://kdeconnect.kde.org/) — two-way integration: share files and clipboard, receive phone notifications, ring/find the device, and use remote input. Install [hypr-kdeconnect-fix](https://github.com/gfhdhytghd/hypr-kdeconnect-fix) to make the remote input function work on Hyprland.
+
+  **Device access**
+
+  - **Android (adb / MTP)** — install `android-tools` for `adb`. Enable USB debugging on the phone. For file-manager access, install `gvfs-mtp` and set the phone to file-transfer mode.
+  - **iOS (libimobiledevice / ifuse)** — install [`libimobiledevice`](https://libimobiledevice.org/) and [`ifuse`](https://github.com/libimobiledevice/ifuse). Some setups also need `usbmuxd` running.
+
+  **Screen mirroring**
+
+  - [**scrcpy**](https://github.com/Genymobile/scrcpy) — display and control Android devices over USB or TCP/IP via `adb`. Requires USB debugging enabled.
+  - [**Escrcpy**](https://github.com/viarotel-org/escrcpy) — graphical frontend for `scrcpy` for managing multiple devices from a GUI.
+
+  **Quick local file sharing**
+
+  - [**LocalSend**](https://localsend.org/) — cross-platform local-network file sharing; no cloud, SSH, or SMB required. Install on both devices and keep them on the same network.
+  - [**Fyde Drop**](https://drop.fydeos.io/) — browser-based local-network file transfer for quick one-off shares without installing an app.
+</Accordion>
+
+<Accordion title="UWSM (Universal Wayland Session Manager)">
+  [UWSM](https://github.com/Vladimir-csp/uwsm) wraps standalone Wayland compositors in a set of systemd units, providing robust session management, XDG autostart support, bi-directional login session binding, and clean shutdown.
+
+  <Warning>
+    UWSM is intended for advanced users. It introduces additional session management conventions and some quirks to be aware of.
+  </Warning>
+
+  **Installation**
+
+  ```sh
+  # Arch Linux
+  pacman -S uwsm libnewt
+  ```
+
+  ```nix
+  # NixOS
+  { programs.hyprland.withUWSM = true; }
+  ```
+
+  **Launching from a TTY**
+
+  Add to your shell profile to show the compositor selection menu:
+
+  ```sh
+  if uwsm check may-start && uwsm select; then
+      exec uwsm start default
+  fi
+  ```
+
+  Or launch Hyprland directly without the menu:
+
+  ```sh
+  if uwsm check may-start; then
+      exec uwsm start hyprland.desktop
+  fi
+  ```
+
+  **Launching from a display manager**
+
+  Choose the `Hyprland (uwsm-managed)` entry in the display manager session selector.
+
+  **Launching applications as systemd units**
+
+  Prefix app commands with `uwsm app --` to run them as proper units:
+
+  ```sh
+  uwsm app -- firefox
+  uwsm app -- /path/to/app.desktop
+  ```
+
+  Faster alternatives: [`uwsm-app`](https://github.com/Vladimir-csp/uwsm), [`app2unit`](https://github.com/Vladimir-csp/app2unit), [`runapp`](https://github.com/c4rlo/runapp/).
+
+  **Autostart with systemd**
+
+  Replace `hl.exec_cmd("hyprpaper")` in your config with a one-time `systemctl --user enable hyprpaper.service`. Systemd then manages the lifecycle.
+
+  **Environment variables**
+
+  Avoid placing environment variables in `hyprland.lua` when using UWSM. Use these files instead:
+
+  | File | Purpose |
+  |---|---|
+  | `~/.config/uwsm/env` | Theming, XCursor, NVIDIA, toolkit vars |
+  | `~/.config/uwsm/env-hyprland` | `HYPR*` and `AQ_*` vars |
+
+  ```sh
+  # ~/.config/uwsm/env-hyprland
+  export AQ_DRM_DEVICES="/dev/dri/card0:/dev/dri/card1"
+  ```
+
+  **Stopping the session**
+
+  Use `uwsm stop` (not `dispatch exit`) to gracefully bring down the graphical session. If units enter inconsistent states, use `loginctl terminate-user ""` to reset all user units.
+</Accordion>
+
+<Accordion title="Other Utilities">
+  Useful tools that don't fit neatly into the categories above.
+
+  **Workspace management**
+
+  - [**split-monitor-workspaces**](https://github.com/Duckonaut/split-monitor-workspaces) — Awesome-like per-monitor workspaces for Hyprland as a plugin.
+
+  **Window switchers**
+
+  - [**snappy-switcher**](https://github.com/OpalAayan/snappy-switcher) — animated Alt+Tab window switcher for Hyprland written in C with Pango and Cairo.
+
+  **Keyboard layout management**
+
+  - [**hyprland-per-window-layout**](https://github.com/coffebar/hyprland-per-window-layout/) — remembers and restores keyboard layout per window.
+
+  **Editor support for config files**
+
+  - [**HyprLS**](https://github.com/hyprland-community/hyprls) — LSP server for Hyprland config files; provides auto-completion in Neovim, VS Code, and other LSP-aware editors.
+
+  **Keybind management**
+
+  - [**hyprKCS**](https://github.com/kosa12/hyprKCS) — fast, minimal GTK4 keybind manager written in Rust.
+
+  **IPC wrappers**
+
+  - [**hyprland-rs**](https://github.com/yavko/hyprland-rs) — Rust wrapper for Hyprland's IPC socket.
+
+  **Screen shaders and color temperature**
+
+  - [**hyprshade**](https://github.com/loqusion/hyprshade) — swap and schedule screen shaders; also works as an automatic color temperature shifter.
+  - [**gammastep**](https://gitlab.com/chinstrap/gammastep) — automatically adjusts color temperature based on time of day and location.
+
+  **Wireless settings**
+
+  - [**iwgtk**](https://github.com/J-Lentz/iwgtk) — GTK frontend for `iwd` Wi-Fi management.
+  - [**blueberry**](https://github.com/linuxmint/blueberry) — GTK Bluetooth settings frontend by Linux Mint.
+  - [**Overskride**](https://github.com/kaii-lb/overskride) — powerful GTK4 Bluetooth client.
+  - [**nm-applet**](https://gitlab.gnome.org/GNOME/network-manager-applet) — GNOME GTK applet for NetworkManager.
+
+  **Automatic USB mounting**
+
+  - [**udiskie**](https://github.com/coldfix/udiskie) — udisks2 front-end for auto-mounting removable media from userspace. Add `udiskie` to your Hyprland autostarts.
+
+  **More utilities**
+
+  The website [We Are Wayland Now](https://wearewaylandnow.com/) catalogues additional Wayland-compatible applications including docks, email clients, and compatibility notes.
+</Accordion>

@@ -1,0 +1,181 @@
+---
+title: "Hyprland Built-in Notifications: Display Alerts"
+sidebarTitle: Notifications
+description: "How to create, configure, and dismiss Hyprland's built-in notification overlays from Lua config or hyprctl, including icon types, colors, and font size."
+---
+
+Hyprland ships with a lightweight built-in notification system that displays simple text overlays in the top-right corner of the active monitor. These notifications are compositor-native — they appear even before any notification daemon is running — and are ideal for config feedback, keybind confirmations, and debugging. They are **not** a replacement for a full desktop notification daemon (such as mako or dunst) and do not handle D-Bus `org.freedesktop.Notifications` messages.
+
+<Note>
+  Built-in notifications are positioned in the top-right corner of the **active monitor**. They are purely visual overlays managed entirely by Hyprland and do not interact with your system notification stack.
+</Note>
+
+---
+
+## Notification Parameters
+
+Every notification is described by a set of properties:
+
+| Name | Type | Default | Description |
+|------|------|---------|-------------|
+| `text` | string | *(empty)* | The message text to display. |
+| `timeout` | int | *(required)* | How long the notification is shown, in milliseconds. |
+| `icon` | string | `"none"` | Icon type. See the [Icon Reference](#icon-reference) below. |
+| `color` | color | `0` | Notification background color. `0` uses the default color for the chosen icon. |
+| `font_size` | int | `13` | Font size used to render the notification text. |
+
+---
+
+## Icon Reference
+
+Icons are selected by their Lua name (for use in `hl.notification.create()`) or by their numeric hyprctl ID (for use with `hyprctl notify`).
+
+| Name | Lua name | hyprctl ID | Default color |
+|------|----------|------------|---------------|
+| None | `none` | `-1` | `#000000` |
+| Warning | `warn` / `warning` | `0` | `#FFCC66` |
+| Info | `info` | `1` | `#80FFFF` |
+| Hint | `hint` | `2` | `#B3FFCC` |
+| Error | `err` / `error` | `3` | `#FF4D4D` |
+| Confused | `confused` / `question` | `4` | `#FFCC99` |
+| Ok | `ok` | `5` | `#80FF80` |
+
+Setting `color` to `0` (the default) automatically uses the default color for the chosen icon.
+
+---
+
+## Creating Notifications
+
+<Tabs>
+  <Tab title="Lua">
+    Use `hl.notification.create({ ... })` inside any Lua config, keybind, or event callback. The function returns an `HL.Notification` object you can store for later reference.
+
+    ```lua
+    -- Simple info notification
+    hl.notification.create({
+      text = "Hello from Lua!",
+      timeout = 15000,
+      icon = "info",
+      font_size = 20
+    })
+    ```
+
+    ```lua
+    -- Store the notification object for later use
+    local n = hl.notification.create({
+      text = "Please store me",
+      timeout = 228638,
+      icon = "hint"
+    })
+    ```
+
+    ```lua
+    -- Get a table of all currently active notifications
+    local active = hl.notification.get()
+    ```
+
+    <Tip>
+      `hl.notification.create()` is available everywhere in your Lua config, including inside `hl.on()` event callbacks and `hl.bind()` keybind handlers. This makes it easy to build context-aware alerts.
+    </Tip>
+
+    ### Example: Notify on window open
+
+    ```lua
+    hl.on("window.open", function(w)
+      hl.notification.create({
+        text = "Opened: " .. w.class,
+        timeout = 3000,
+        icon = "ok"
+      })
+    end)
+    ```
+
+    ### Example: Notify on monitor connect
+
+    ```lua
+    hl.on("monitor.added", function(m)
+      hl.notification.create({
+        text = "Monitor connected: " .. m.name,
+        timeout = 5000,
+        icon = "info",
+        font_size = 16
+      })
+    end)
+    ```
+  </Tab>
+  <Tab title="hyprctl">
+    Use `hyprctl notify` to send a notification from a shell script or terminal. The argument order is: icon ID, timeout in milliseconds, color, and message text.
+
+    ```sh
+    hyprctl notify <ICON_ID> <TIME_MS> <COLOR> <MESSAGE>
+    ```
+
+    ```sh
+    # Info notification for 10 seconds with a custom color
+    hyprctl notify -1 10000 "rgb(ff1ea3)" "Hello everyone!"
+
+    # Error notification with larger font
+    hyprctl notify 3 8000 "rgb(ff4d4d)" "fontsize:20 Something went wrong!"
+
+    # Using the default icon color (pass 0)
+    hyprctl notify 1 5000 0 "Config loaded successfully"
+    ```
+
+    To customize font size, prefix the message text with `fontsize:<SIZE>`:
+
+    ```sh
+    hyprctl notify -1 10000 "rgb(ff0000)" "fontsize:35 This text is big"
+    ```
+
+    ### Dismissing notifications
+
+    ```sh
+    hyprctl dismissnotify      # dismiss all active notifications
+    hyprctl dismissnotify -1   # same as above (explicit)
+    hyprctl dismissnotify 2    # dismiss only the 2 oldest notifications
+    ```
+  </Tab>
+</Tabs>
+
+---
+
+## Full Usage Examples
+
+<Steps>
+  <Step title="Config-load confirmation">
+    Show a success notification every time the config is reloaded and applied.
+
+    ```lua
+    hl.on("config.reloaded", function()
+      hl.notification.create({
+        text = "Config reloaded successfully",
+        timeout = 3000,
+        icon = "ok"
+      })
+    end)
+    ```
+  </Step>
+  <Step title="Submap indicator">
+    Display which submap is active whenever you enter one.
+
+    ```lua
+    hl.on("keybinds.submap", function(name)
+      if name ~= "" then
+        hl.notification.create({
+          text = "Submap: " .. name,
+          timeout = 2000,
+          icon = "info",
+          font_size = 18
+        })
+      end
+    end)
+    ```
+  </Step>
+  <Step title="Debug notification from hyprctl">
+    Quickly test the notification system from a terminal.
+
+    ```sh
+    hyprctl notify 2 6000 0 "fontsize:16 Test notification from terminal"
+    ```
+  </Step>
+</Steps>

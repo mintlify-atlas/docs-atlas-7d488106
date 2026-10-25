@@ -1,0 +1,278 @@
+---
+title: "Dispatchers Reference for Hyprland Actions"
+sidebarTitle: "Dispatchers"
+description: "Reference for all Hyprland hl.dsp.* dispatchers: window, workspace, group, cursor actions, special workspaces, set_prop, and fullscreen state control."
+---
+
+Dispatchers are Lua functions under the `hl.dsp.*` namespace that return a **description table** of an action — they do not execute anything immediately. Feed them into `hl.bind()` to trigger them on a keypress, or wrap them in `hl.dispatch()` to execute them inside a Lua function.
+
+Simply writing `hl.dsp.whatever()` on its own does nothing. You must pass the result to `hl.dispatch()` or `hl.bind()`.
+
+```lua
+-- Inside a function: use hl.dispatch() to execute
+hl.bind("ALT + Tab", function()
+    hl.dispatch(hl.dsp.window.cycle_next())
+    hl.dispatch(hl.dsp.window.alter_zorder({ mode = "top" }))
+end)
+
+-- Directly in hl.bind: no hl.dispatch() needed
+hl.bind("SUPER + Q", hl.dsp.exec_cmd("kitty"))
+```
+
+## Parameter Conventions
+
+| Param | Default | Accepted values |
+| --- | --- | --- |
+| `window` | `"activewindow"` | Any [window selector](/configuring/selectors#window-selector) |
+| `action` | `"toggle"` | `"toggle"`, `"enable"`/`"on"`, `"disable"`/`"off"` |
+| `relative` | `false` | `true`, `false` |
+
+---
+
+## General (`hl.dsp.`)
+
+| Method | Description |
+| --- | --- |
+| `dpms({ monitor?, action? })` | Toggle monitor on/off (software DPMS — not physical). **Do not bind directly to a key**; use a timer. |
+| `event(string)` | Send an event to socket2 |
+| `exec_cmd(cmd, { rules }?)` | Execute a shell command (`sh -c`). Optionally pass window rule effects as a table |
+| `exec_raw(cmd)` | Execute a command without `sh -c` |
+| `exit()` | Quit Hyprland. Prefer `hyprshutdown` instead |
+| `focus({ direction })` | Move keyboard focus in a direction |
+| `focus({ monitor })` | Move focus to a monitor |
+| `focus({ workspace, on_current_monitor? })` | Move focus to a workspace |
+| `focus({ window })` | Move focus to a window |
+| `focus({ urgent_or_last })` | Move focus to an urgent window, or the last focused one |
+| `focus({ last })` | Move focus to the last focused window |
+| `force_idle(int)` | Set elapsed time for idle timers in seconds. **Do not bind directly.** |
+| `force_renderer_reload()` | Force-reload the renderer on all monitors |
+| `global(string)` | Activate a D-Bus GlobalShortcuts portal shortcut |
+| `layout(message)` | Send a string message to the active layout |
+| `no_op()` | Do nothing. Useful for conditional binds |
+| `pass({ window? })` | Pass the current shortcut to a window (e.g. for OBS global hotkeys) |
+| `release_input_capture()` | Release any active input capture session |
+| `reload_config()` | Reload the configuration (same as `hyprctl reload`) |
+| `send_key_state({ window?, mods, key, state })` | Send a key event with explicit state: `"down"` or `"up"` |
+| `send_shortcut({ window?, mods, key })` | Send a specific shortcut to a window |
+| `submap(name)` | Switch to a named submap, or `"reset"` for the default |
+
+<Warning>
+Do not bind `dpms` or `force_idle` directly to a key as it may cause undefined behaviour. Use a timer instead:
+
+```lua
+hl.bind("SUPER + Escape", function()
+    hl.timer(function()
+        hl.dispatch(hl.dsp.dpms({ action = "disable" }))
+    end, { timeout = 500, type = "oneshot" })
+end)
+```
+</Warning>
+
+### Executing with Rules
+
+`exec_cmd` supports window rule effects to apply to the spawned window:
+
+```lua
+hl.bind("SUPER + E", hl.dsp.exec_cmd("kitty", { float = true, move = {0, 0} }))
+```
+
+Note: this works by tracking the spawned process PID. If the process forks before opening a window, it will not work.
+
+---
+
+## Window (`hl.dsp.window.`)
+
+| Method | Description |
+| --- | --- |
+| `alter_zorder({ window?, mode })` | Change z-order: `mode` is `"top"` or `"bottom"` |
+| `center({ window? })` | Center the window on its monitor |
+| `clear_tags({ window? })` | Clear all tags from a window |
+| `close({ window? })` | Send a graceful close request |
+| `cycle_next({ window?, next?, tiled?, floating? })` | Focus the next window, optionally filtering by type |
+| `deny_from_group({ action? })` | Prevent a window from entering or forming a group |
+| `drag()` | Begin an interactive drag — use with `mouse` bind flag |
+| `float({ window?, action? })` | Set floating state: `"toggle"`, `"set"`, `"unset"` |
+| `fullscreen({ window?, action?, mode?, layout_aware? })` | Set fullscreen state. `mode`: `"maximized"` or `"fullscreen"` |
+| `fullscreen_state({ window?, action?, internal, client, layout_aware? })` | Decouple internal vs. client fullscreen state. See [fullscreen_state](#fullscreen-state) |
+| `kill({ window? })` | Kill the process owning the window with SIGKILL |
+| `move({ window?, direction, group_aware? })` | Move window in a direction |
+| `move({ window?, workspace, follow? })` | Move window to a workspace |
+| `move({ window?, monitor, follow? })` | Move window to a monitor |
+| `move({ window?, x, y, relative? })` | Move window by or to a coordinate |
+| `move({ window?, into_group = direction })` | Move window into a group in a direction |
+| `move({ window?, into_or_create_group = direction })` | Move into an existing group or create one |
+| `move({ window?, out_of_group })` | Move window out of a group (`true` = directionless) |
+| `pin({ window?, action? })` | Pin window to show on all workspaces |
+| `pseudo({ window?, action? })` | Toggle pseudotiling |
+| `resize({ keep_aspect_ratio? })` | Begin interactive resize — use with `mouse` bind flag |
+| `resize({ window?, x, y, relative? })` | Resize a window by or to a size |
+| `set_prop({ window?, prop, value })` | Set a dynamic window property. See [set_prop](#set_prop) |
+| `signal({ window?, signal })` | Send a POSIX signal to the process owning the window |
+| `swap({ direction })` | Swap with the window in a direction |
+| `swap({ target })` | Swap with a specific window |
+| `swap({ next })` | Swap with the next window |
+| `swap({ prev })` | Swap with the previous window |
+| `tag({ window?, tag })` | Add/remove/toggle a static tag on a window |
+| `toggle_swallow()` | Toggle visibility of all swallowed windows |
+
+---
+
+## Workspace (`hl.dsp.workspace.`)
+
+| Method | Description |
+| --- | --- |
+| `move({ workspace?, monitor })` | Move a workspace to a monitor |
+| `rename({ workspace, name? })` | Rename a workspace's display name (identity is unchanged) |
+| `swap_monitors({ monitor1, monitor2 })` | Swap active workspaces between two monitors |
+| `toggle_special(special_name)` | Toggle a special (scratchpad) workspace by name |
+
+<Note>
+`toggle_special()` accepts a name **without** the `special:` prefix — it adds it automatically. Dispatchers that accept any workspace (e.g. `window.move`) do require the full `special:name` form.
+</Note>
+
+---
+
+## Group (`hl.dsp.group.`)
+
+Groups are tabbed containers — one window visible at a time, toggled with the keyboard. They are similar to i3's "tabbed" containers.
+
+| Method | Description |
+| --- | --- |
+| `active({ window?, index })` | Switch to the window at a given index in the group |
+| `lock({ all?, action? })` | Lock all groups |
+| `lock({ window?, action? })` | Lock a specific window's group |
+| `move_window({ window?, forward? })` | Reorder a window within the group |
+| `next({ window? })` | Switch to the next window in the group |
+| `prev({ window? })` | Switch to the previous window in the group |
+| `toggle({ window? })` | Toggle a group on the current/specified window |
+
+Use `deny_from_group` in `hl.dsp.window` to prevent a window from entering or becoming a group.
+
+---
+
+## Cursor (`hl.dsp.cursor.`)
+
+| Method | Description |
+| --- | --- |
+| `move({ x, y })` | Move the cursor to the given screen coordinates |
+| `move_to_corner({ window?, corner })` | Move the cursor to a corner of the window. Corner is `0`–`3` |
+
+---
+
+## Special Workspaces (Scratchpads)
+
+Special workspaces are toggleable overlays visible on any monitor. Up to 97 may exist at once.
+
+```lua
+-- Send a window to a named special workspace
+hl.bind("SUPER + SHIFT + S", hl.dsp.window.move({ workspace = "special:magic" }))
+
+-- Toggle the special workspace
+hl.bind("SUPER + S", hl.dsp.workspace.toggle_special("magic"))
+```
+
+---
+
+## set_prop
+
+`set_prop` applies any [dynamic window effect](/configuring/rules#dynamic-effects) to a window at runtime:
+
+```lua
+hl.dsp.window.set_prop({ prop = "no_anim", value = "1" })
+hl.dsp.window.set_prop({ prop = "no_anim", value = "1", window = "class:abc" })
+```
+
+Use the value `"unset"` to remove a previously set prop and return to the rule-defined or default value.
+
+Some props are read-only and aggregate from window rules:
+- `border_color` — set from `active_border_color` / `inactive_border_color`
+- `opacity` — combined from `opacity`, `opacity_inactive`, `opacity_fullscreen`, and their `_override` variants
+
+---
+
+## Fullscreen State
+
+`fullscreen_state` decouples what Hyprland does internally from what is reported to the client application:
+
+| Value | State | Description |
+| --- | --- | --- |
+| `-1` | Current | Keep existing state unchanged |
+| `0` | None | Window uses normal layout space |
+| `1` | Maximized | Window fills the working area (with margins) |
+| `2` | Fullscreen | Window fills the entire screen |
+
+```lua
+-- Fullscreen Hyprland-side, but tell the browser it is still windowed
+-- (prevents Chromium from entering presentation mode)
+hl.dsp.window.fullscreen_state({ internal = 2, client = 0 })
+
+-- Keep window non-fullscreen but trick app into thinking it is fullscreen
+hl.dsp.window.fullscreen_state({ internal = 0, client = 2 })
+```
+
+### Fullscreen Handlers
+
+Layouts like scrolling provide their own fullscreen handling. The `layout_aware` parameter controls which handler is used (`true` = layout handler, `false` = default). Lua can inspect which handler a window uses:
+
+```lua
+local win = hl.get_active_window()
+if win.fullscreen_handler == "default" then
+    -- use default fullscreen behaviour
+end
+```
+
+---
+
+## Practical Examples
+
+<CodeGroup>
+
+```lua Window Management
+-- Move window to workspace 3
+hl.bind("SUPER + SHIFT + 3", hl.dsp.window.move({ workspace = 3 }))
+
+-- Float/tile toggle
+hl.bind("SUPER + V", hl.dsp.window.float())
+
+-- Pseudo-tile toggle
+hl.bind("SUPER + P", hl.dsp.window.pseudo())
+
+-- Move floating window to center
+hl.bind("SUPER + C", hl.dsp.window.center())
+
+-- Close active window gracefully
+hl.bind("SUPER + Q", hl.dsp.window.close())
+```
+
+```lua Focus and Navigation
+-- Focus in directions
+hl.bind("SUPER + h", hl.dsp.focus({ direction = "left" }))
+hl.bind("SUPER + l", hl.dsp.focus({ direction = "right" }))
+hl.bind("SUPER + k", hl.dsp.focus({ direction = "up" }))
+hl.bind("SUPER + j", hl.dsp.focus({ direction = "down" }))
+
+-- Switch workspaces
+hl.bind("SUPER + 1", hl.dsp.focus({ workspace = 1 }))
+hl.bind("SUPER + Tab", hl.dsp.focus({ workspace = "previous" }))
+
+-- Focus urgent or last window
+hl.bind("SUPER + U", hl.dsp.focus({ urgent_or_last = true }))
+```
+
+```lua Groups
+-- Toggle a group
+hl.bind("SUPER + G", hl.dsp.group.toggle())
+
+-- Navigate within a group
+hl.bind("SUPER + bracketleft",  hl.dsp.group.prev())
+hl.bind("SUPER + bracketright", hl.dsp.group.next())
+
+-- Lock the group
+hl.bind("SUPER + SHIFT + G", hl.dsp.group.lock())
+
+-- Move window into adjacent group
+hl.bind("SUPER + CTRL + h", hl.dsp.window.move({ into_group = "l" }))
+hl.bind("SUPER + CTRL + l", hl.dsp.window.move({ into_group = "r" }))
+```
+
+</CodeGroup>

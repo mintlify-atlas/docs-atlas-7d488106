@@ -1,0 +1,200 @@
+---
+title: "Using Hyprland Plugins: hyprpm and Manual Loading"
+sidebarTitle: Using Plugins
+description: "Install, enable, and manage Hyprland plugins safely using hyprpm or manual hyprctl commands, with security guidance for every step."
+---
+
+Hyprland plugins extend the compositor with capabilities that go far beyond what configuration alone can offer. Because plugins are compiled C++ code that runs directly inside the Hyprland process, they carry real security implications — so reading this page in full before installing anything is strongly recommended.
+
+## Security Considerations
+
+<Warning>
+Plugins are written in C++ and execute as part of the Hyprland process with nearly unrestricted access to your system. **Always read the source code** of every plugin before installing it, and only use plugins from sources you personally trust. Writing a plugin that wipes your computer is trivially easy.
+
+**Never load a random `.so` file** you received from an untrusted person or downloaded without verifying its origin.
+</Warning>
+
+## What Plugins Are
+
+Plugins are **shared objects** — compiled `.so` files that Hyprland loads into its own process at runtime. Once loaded, a plugin has access to almost every part of Hyprland's internals: rendering, window management, input handling, configuration, and more. Hyprland ships with no default plugins; any plugin you want must be sourced, reviewed, and installed by you.
+
+---
+
+## Installing Plugins with hyprpm
+
+The recommended way to manage plugins is the **Hyprland Plugin Manager**, `hyprpm`. It handles downloading, building, enabling, disabling, and updating plugins from Git repositories.
+
+### Prerequisites
+
+Make sure the following tools are installed before using `hyprpm`:
+
+- `cpio`, `cmake`, `git`, `meson`, `gcc`
+- Development headers for Hyprland's dependencies (on distros like Fedora or Debian that split headers into `-dev` packages, install those too)
+
+<Note>
+If your system uses [permission management](/configuring/advanced/permissions), add the following to your Hyprland config so `hyprpm` can load plugins without prompting every time:
+
+```lua
+hl.permission("/usr/(bin|local/bin)/hyprpm", "plugin", "allow")
+```
+</Note>
+
+### Adding a Plugin Repository
+
+Find a plugin repository you want to use. The example below uses the official [hyprland-plugins](https://github.com/hyprwm/hyprland-plugins) repo:
+
+```sh
+hyprpm add https://github.com/hyprwm/hyprland-plugins
+```
+
+`hyprpm` will clone the repository, check it against your installed Hyprland version, and build every plugin defined in the repo's manifest.
+
+### Listing Installed Plugins
+
+```sh
+hyprpm list
+```
+
+This shows all plugins that have been added, along with their enabled/disabled state.
+
+### Enabling and Disabling Plugins
+
+```sh
+hyprpm enable plugin-name
+hyprpm disable plugin-name
+```
+
+Substitute `plugin-name` with the exact name shown by `hyprpm list`.
+
+### Loading Plugins into the Running Session
+
+```sh
+hyprpm reload
+```
+
+This loads all currently enabled plugins into the live Hyprland instance. Run this after enabling or disabling plugins for changes to take effect.
+
+<Tip>
+Add `hyprpm reload` to your Hyprland autostart section so plugins are loaded automatically on every login. Use the `-n` flag to display a notification when loading succeeds:
+
+```sh
+exec-once = hyprpm reload -n
+```
+
+Warning and error notifications are always shown regardless of whether `-n` is passed.
+</Tip>
+
+### Updating Plugins
+
+```sh
+hyprpm update
+```
+
+This pulls the latest commits for every added repository and rebuilds any plugins that changed.
+
+### Full Help
+
+```sh
+hyprpm -h
+```
+
+---
+
+## Manual Plugin Loading
+
+If you prefer not to use `hyprpm`, or if a plugin has a non-standard build system, you can build and load plugins by hand.
+
+<Steps>
+  <Step title="Get Hyprland Headers">
+    If you installed Hyprland with `make install`, the headers are already present.
+
+    Otherwise, clone the Hyprland source, check out the tag that matches your installed version, build it, and install the headers:
+
+    ```sh
+    git clone https://github.com/hyprwm/Hyprland
+    cd Hyprland
+    git checkout vX.Y.Z   # match your installed version
+    make debug
+    sudo make installheaders
+    ```
+  </Step>
+
+  <Step title="Build the Plugin">
+    Follow the specific build instructions for the plugin you want to use. Most plugins provide a `Makefile` or `CMakeLists.txt`. The output is a `.so` file.
+  </Step>
+
+  <Step title="Load the Plugin">
+    Load the `.so` using `hyprctl` with an **absolute path**:
+
+    ```sh
+    hyprctl plugin load /absolute/path/to/plugin.so
+    ```
+
+    <Warning>
+    The path **must** be absolute. Relative paths will not work.
+    </Warning>
+  </Step>
+
+  <Step title="Unload the Plugin">
+    ```sh
+    hyprctl plugin unload /absolute/path/to/plugin.so
+    ```
+  </Step>
+</Steps>
+
+---
+
+## Using Plugin Config and Functions in Your Config File
+
+Some plugins expose config variables and callable functions. Access them through the `hl.plugin` namespace in your Hyprland config:
+
+```lua
+function M.setup_vkfix()
+    if hl.plugin.csgo_vulkan_fix ~= nil then
+        hl.plugin.csgo_vulkan_fix.vkfix_app({ app = "cs2", w = 2304, h = 1440 })
+        hl.config({
+            plugin = {
+                csgo_vulkan_fix = {
+                    fix_mouse = false
+                }
+            }
+        })
+    end
+end
+```
+
+<Note>
+Guard plugin calls with a `~= nil` check. If the plugin has not been loaded yet when the config runs, calling its functions directly will produce an error.
+</Note>
+
+---
+
+## FAQ
+
+<Accordion title="My Hyprland crashed after loading a plugin. What do I do?">
+This usually means the plugin itself is buggy. Disable it with `hyprpm disable plugin-name` and then run `hyprpm reload`, or remove the `hyprctl plugin load` line from your config if you loaded it manually.
+</Accordion>
+
+<Accordion title="How do I see which plugins are currently loaded?">
+```sh
+hyprctl plugin list
+```
+</Accordion>
+
+<Accordion title="Are plugins safe?">
+A plugin is as safe as its source code. Read the code before installing. If you understand what a plugin does and trust its author, it is safe to use. Hyprland includes some fault-detection logic to unload crashing plugins, but this is not guaranteed to catch every failure mode.
+</Accordion>
+
+<Accordion title="Do plugins degrade Hyprland's stability?">
+Well-written plugins should have no measurable impact on stability. Hyprland attempts to unload plugins that cause crashes, though this mechanism does not cover every scenario. Prefer plugins that are actively maintained and reviewed.
+</Accordion>
+
+<Accordion title="Where can I find plugins?">
+- Official featured plugins: [hypr.land/plugins](https://hypr.land/plugins/)
+- Community list: [awesome-hyprland](https://github.com/hyprland-community/awesome-hyprland#plugins)
+- GitHub search: `"hyprland plugin"`
+</Accordion>
+
+<Accordion title="How do I write my own plugin?">
+See the [Plugin Development](./development) guide for a full walkthrough.
+</Accordion>

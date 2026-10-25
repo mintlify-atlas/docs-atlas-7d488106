@@ -1,0 +1,554 @@
+---
+title: "Hyprland Configuration Options Reference Guide"
+sidebarTitle: "Config Options"
+description: "Complete reference for Hyprland config options: general, decoration, blur, shadow, input, gestures, group, misc, binds, cursor, render, and debug sections."
+---
+
+Hyprland's configuration is driven by a Lua-based config file. Every option lives under a named category and is set using `hl.config()`. This page documents every option available across all core sections — excluding layout-specific options, which are described on their respective layout pages.
+
+<Note>
+Before continuing, familiarise yourself with the [naming conventions used in this wiki](/configuring/selectors). In particular, be aware of data types like `css_gaps`, `gradient`, `color`, and `vec2`.
+</Note>
+
+## Syntax
+
+You can update many options at once:
+
+```lua
+hl.config({
+  category1 = {
+    option = value,
+  },
+  category2 = {
+    option1 = value1,
+    option2 = value2,
+  },
+})
+```
+
+Or only a few with dotted keys:
+
+```lua
+hl.config({ ["category.option"] = value })
+```
+
+Multiple `hl.config()` calls are allowed — each call only updates what was passed in. **If the same option is set multiple times, the last line wins.** You can also update options at runtime without touching your config file using `hyprctl eval 'hl.config(...)'`; those values revert to defaults on the next reload.
+
+---
+
+## General
+
+**Category:** `general`
+
+| Name | Description | Type | Default | Limits |
+| --- | --- | --- | --- | --- |
+| `allow_tearing` | Master switch for allowing tearing. See the Tearing page | bool | `false` | |
+| `border_size` | Size of the border around windows | int | `1` | [0 – 20] |
+| `extend_border_grab_area` | Extends the clickable border area when `resize_on_border` is on | int | `15` | [0 – 100] |
+| `float_gaps` | Gaps for floating windows; `-1` means default | css_gaps | `0` | |
+| `gaps_in` | Gaps between windows | css_gaps | `5` | |
+| `gaps_out` | Gaps between windows and monitor edges | css_gaps | `20` | |
+| `gaps_workspaces` | Gaps between workspaces (stacks with `gaps_out`) | int | `0` | [0 – 100] |
+| `hover_icon_on_border` | Show resize cursor icon on borders when `resize_on_border` is on | bool | `true` | |
+| `layout` | Active layout: `"dwindle"` / `"master"` / `"scrolling"` / `"monocle"` | string | `"dwindle"` | |
+| `locale` | Override the system locale, e.g. `"en_US"` | string | `[[Empty]]` | |
+| `modal_parent_blocking` | Whether parent windows of modals are interactive | bool | `true` | |
+| `no_focus_fallback` | If true, don't fall back to another window when no window found in direction | bool | `false` | |
+| `resize_corner` | Force floating windows to use a specific corner when resized (1–4 clockwise from top-left, 0 = disable) | int | `0` | [0 – 4] |
+| `resize_on_border` | Enable resizing by clicking and dragging on borders and gaps | bool | `false` | |
+
+### General Colors
+
+**Category:** `general.col`
+
+| Name | Description | Type | Default |
+| --- | --- | --- | --- |
+| `active_border` | Border color for the active window | gradient | `0xffffffff` |
+| `inactive_border` | Border color for inactive windows | gradient | `0xff444444` |
+| `nogroup_border` | Border color for inactive windows that cannot join a group | gradient | `0xffffaaff` |
+| `nogroup_border_active` | Border color for the active window that cannot join a group | gradient | `0xffff00ff` |
+
+### Snap
+
+**Category:** `general.snap`
+
+| Name | Description | Type | Default | Limits |
+| --- | --- | --- | --- | --- |
+| `enabled` | Enable snapping for floating windows | bool | `false` | |
+| `border_overlap` | Snap so only one border's width separates windows | bool | `false` | |
+| `respect_gaps` | Respect `gaps_in` when snapping | bool | `false` | |
+| `monitor_gap` | Minimum gap in pixels before snapping to monitor edge | int | `10` | [0 – 100] |
+| `window_gap` | Minimum gap in pixels before snapping to another window | int | `10` | [0 – 100] |
+
+---
+
+## Decoration
+
+**Category:** `decoration`
+
+| Name | Description | Type | Default | Limits |
+| --- | --- | --- | --- | --- |
+| `active_opacity` | Opacity of active windows | float | `1.0` | [0.0 – 1.0] |
+| `border_part_of_window` | Whether the window border is part of the window | bool | `true` | |
+| `dim_around` | How much the `dim_around` window rule dims | float | `0.4` | [0.0 – 1.0] |
+| `dim_inactive` | Enable dimming of inactive windows | bool | `false` | |
+| `dim_modal` | Enable dimming of parents of modal windows | bool | `true` | |
+| `dim_special` | How much to dim the screen when a special workspace is open | float | `0.2` | |
+| `dim_strength` | How much inactive windows are dimmed | float | `0.5` | [0.0 – 1.0] |
+| `fullscreen_opacity` | Opacity of fullscreen windows | float | `1.0` | [0.0 – 1.0] |
+| `inactive_opacity` | Opacity of inactive windows | float | `1.0` | [0.0 – 1.0] |
+| `rounding` | Rounded corner radius in layout px | int | `0` | [0 – 100] |
+| `rounding_power` | Curve used for rounding (1.0 = triangular, 2.0 = circle, 4.0 = squircle) | float | `2.0` | [1.0 – 10.0] |
+| `screen_shader` | Path to a custom GLSL screen shader | string | `[[Empty]]` | |
+
+<Note>
+Opacity is a **product** of all opacities. Append `"override"` after a value to treat it as an absolute rather than a multiplier. For example, `opacity = "0.8 override 0.8 override 1.0 override"` sets active/inactive/fullscreen independently.
+</Note>
+
+### Blur
+
+**Category:** `decoration.blur`
+
+| Name | Description | Type | Default | Limits |
+| --- | --- | --- | --- | --- |
+| `enabled` | Enable kawase window background blur | bool | `true` | |
+| `brightness` | Brightness modulation for blur | float | `1` | [0.0 – 2.0] |
+| `contrast` | Contrast modulation for blur | float | `0.8916` | [0.0 – 2.0] |
+| `ignore_opacity` | Blur layer ignores the window's opacity | bool | `true` | |
+| `input_methods` | Whether to blur input methods like `fcitx5` | bool | `false` | |
+| `input_methods_ignorealpha` | Skip blur on pixels with opacity below this threshold | float | `0.2` | [0.0 – 1.0] |
+| `new_optimizations` | Enable further blur optimizations (recommended) | bool | `true` | |
+| `noise` | Amount of noise to apply | float | `0.0117` | [0.0 – 1.0] |
+| `passes` | Number of passes to perform (must be ≥ 1) | int | `1` | [0 – 10] |
+| `popups` | Whether to blur popups such as right-click menus | bool | `false` | |
+| `popups_ignorealpha` | Skip blur on popup pixels below this opacity | float | `0.2` | [0.0 – 1.0] |
+| `size` | Blur size/distance (must be ≥ 1) | int | `8` | |
+| `special` | Blur behind the special workspace (expensive) | bool | `false` | |
+| `variant` | Blur pattern variant | string | `kawase` | |
+| `vibrancy` | Increase saturation of blurred colors | float | `0.1696` | [0.0 – 1.0] |
+| `vibrancy_darkness` | Strength of `vibrancy` on dark areas | float | `0.0` | [0.0 – 1.0] |
+| `xray` | Floating windows ignore tiled windows in their blur | bool | `false` | |
+
+<Accordion title="Blur variants">
+Available `variant` values:
+
+- `kawase` — default diffused blur
+- `acrylic` — liquid glass-like effect
+- `aurora` — aurora light streaks
+- `drops` — rain on a window pane
+- `fluid_jar` — 2D fluid simulation
+- `frost` — cracked ice
+- `haze` — pearlescent sheen
+- `heat_shimmer` — subtle shimmer with chromatic aberration
+- `prism` — triangular refraction mask
+- `ripple` — ripple on click
+- `water` — ripple via heightmap
+
+Each variant may expose additional sub-options under `decoration.blur.<variant>`. Key ones include:
+
+**`decoration.blur.acrylic`** — `aberration`, `bulb`, `clarity`, `refraction`, `tint`
+
+**`decoration.blur.aurora`** — `color1`, `color2`, `intensity`, `speed`
+
+**`decoration.blur.drops`** — `speed`
+
+**`decoration.blur.fluid_jar`** — `color`, `distortion`, `fill_amount`, `mass`, `precision`, `speed`, `turbulence`
+
+**`decoration.blur.glass`** (used by `aurora`, `drops`, `heat_shimmer`, `prism`) — `refraction`, `roughness`, `size`
+
+**`decoration.blur.haze`** — `intensity`, `iridescence`
+
+**`decoration.blur.heat_shimmer`** — `speed`
+
+**`decoration.blur.ripple`** — `duration`, `radius`, `strength`, `width`
+
+**`decoration.blur.water`** — `damping`, `duration`, `radius`, `speed`, `strength`
+</Accordion>
+
+### Shadow
+
+**Category:** `decoration.shadow`
+
+| Name | Description | Type | Default | Limits |
+| --- | --- | --- | --- | --- |
+| `enabled` | Enable drop shadows | bool | `true` | |
+| `color` | Active window shadow color | color/gradient | `0xee1a1a1a` | |
+| `color_inactive` | Inactive window shadow color (falls back to `color`) | color/gradient | `[[Empty]]` | |
+| `offset` | Shadow rendering offset | vec2 | `{0, 0}` | |
+| `range` | Shadow range in pixels | int | `4` | [0 – 100] |
+| `render_power` | Falloff exponent (higher = faster falloff) | int | `3` | [1 – 4] |
+| `scale` | Shadow scale | float | `1.0` | [0.05 – 2.0] |
+| `sharp` | Make shadows sharp (infinite render power) | bool | `false` | |
+
+### Glow
+
+**Category:** `decoration.glow`
+
+| Name | Description | Type | Default | Limits |
+| --- | --- | --- | --- | --- |
+| `enabled` | Enable inner glow | bool | `false` | |
+| `color` | Active window glow color | color | `0xee1a1a1a` | |
+| `color_inactive` | Inactive glow color (falls back to `color`) | color | `[[Empty]]` | |
+| `range` | Glow range in pixels | int | `10` | [0 – 100] |
+| `render_power` | Falloff exponent | int | `3` | [1 – 4] |
+
+### Motion Blur
+
+**Category:** `decoration.motion_blur`
+
+| Name | Description | Type | Default | Limits |
+| --- | --- | --- | --- | --- |
+| `enabled` | Enable motion blur on moving/resizing windows | bool | `false` | |
+| `samples` | Number of samples to render (more = clearer) | int | `7` | [1 – 64] |
+
+### Wobble
+
+**Category:** `decoration.wobble`
+
+| Name | Description | Type | Default | Limits |
+| --- | --- | --- | --- | --- |
+| `enabled` | Enable wobble on moving/resizing windows | bool | `false` | |
+| `mesh` | Wobble mesh vertices per edge | int | `12` | [2 – 32] |
+| `stiffness` | Spring stiffness | float | `200` | [0.0001 – 1000] |
+| `damping` | Spring damping | float | `12` | [0 – 1000] |
+| `mass` | Spring mass | float | `1` | [0.0001 – 1000] |
+| `intensity` | Wobble impulse multiplier | float | `0.2` | [0 – 3] |
+| `value_epsilon` | Position epsilon below which wobble is stable | float | `0.25` | [0 – 100] |
+| `velocity_epsilon` | Velocity epsilon below which wobble is stable | float | `2` | [0 – 1000] |
+
+---
+
+## Animations
+
+**Category:** `animations`
+
+| Name | Description | Type | Default |
+| --- | --- | --- | --- |
+| `enabled` | Enable animations | bool | `true` |
+| `workspace_wraparound` | Animate workspaces as if the first and last are adjacent | bool | `false` |
+
+See the [Animations page](/configuring/animations) for full animation tree and curve documentation.
+
+---
+
+## Input
+
+**Category:** `input`
+
+| Name | Description | Type | Default | Limits |
+| --- | --- | --- | --- | --- |
+| `accel_profile` | Cursor acceleration profile: `"adaptive"` / `"flat"` / `"custom"` | string | `[[Empty]]` | |
+| `emulate_discrete_scroll` | Emulate discrete scroll from high-res events (`0`=off, `1`=non-standard only, `2`=all) | int | `1` | [0 – 2] |
+| `float_switch_override_focus` | Focus window under cursor when switching float/tiled (`0`=off, `1`=on, `2`=also float-to-float) | int | `1` | [0 – 2] |
+| `focus_on_close` | Focus behavior after closing: `0`=next candidate, `1`=under cursor, `2`=most recently used | int | `0` | [0 – 2] |
+| `follow_mouse` | How cursor movement affects focus (0–3) | int | `1` | [0 – 3] |
+| `follow_mouse_shrink` | Shrink inactive window hitboxes by N pixels for focus dead-zone | int | `0` | [0 – 300] |
+| `follow_mouse_threshold` | Minimum mouse travel in logical px to focus window under cursor | float | `0.0` | |
+| `force_no_accel` | Force raw signal, bypasses pointer settings (**not recommended**) | bool | `false` | |
+| `kb_file` | Path to a custom `.xkb` file | string | `[[Empty]]` | |
+| `kb_layout` | XKB layout parameter | string | `"us"` | |
+| `kb_model` | XKB model parameter | string | `[[Empty]]` | |
+| `kb_options` | XKB options parameter | string | `[[Empty]]` | |
+| `kb_rules` | XKB rules parameter | string | `[[Empty]]` | |
+| `kb_variant` | XKB variant parameter | string | `[[Empty]]` | |
+| `left_handed` | Swap RMB and LMB | bool | `false` | |
+| `mouse_refocus` | Switch focus to hovered window when pointer crosses boundary | bool | `true` | |
+| `natural_scroll` | Invert scrolling direction | bool | `false` | |
+| `numlock_by_default` | Enable numlock on startup | bool | `false` | |
+| `off_window_axis_events` | Axis events near focused window: `0`=ignore, `1`=out-of-bound coords, `2`=fake closest point, `3`=warp cursor | int | `1` | [0 – 3] |
+| `repeat_delay` | Delay before key repeat starts (ms) | int | `600` | [0 – 2000] |
+| `repeat_rate` | Key repeat rate (repeats/second) | int | `25` | [0 – 200] |
+| `resolve_binds_by_sym` | Activate binds by symbol match across layouts | bool | `false` | |
+| `rotation` | Device rotation in degrees clockwise | int | `0` | [0 – 359] |
+| `scroll_button` | Scroll button ID (`0` = default). Check `wev` | int | `0` | [0 – 300] |
+| `scroll_button_lock` | Toggle scroll button lock instead of hold | bool | `false` | |
+| `scroll_factor` | Multiplier for external mouse scroll | float | `1.0` | [0 – 100] |
+| `scroll_method` | Scroll method: `"2fg"` / `"edge"` / `"on_button_down"` / `"no_scroll"` | string | `[[Empty]]` | |
+| `scroll_points` | Custom scroll acceleration curve: `"<step> <points>"` | string | `[[Empty]]` | |
+| `sensitivity` | Mouse input sensitivity | float | `0.0` | [-1.0 – 1.0] |
+| `special_fallthrough` | Allow focusing regular workspace through special workspace if only floats are there | bool | `false` | |
+| `swallow_focus_click` | First click focuses unfocused window without forwarding the click | bool | `false` | |
+
+<Tip>
+XKB layouts, models, variants, and options can be found in `/usr/share/X11/xkb/rules/evdev.lst`, or via `localectl`. For switchable layouts, see the [Keyboard Layouts section](/configuring/binds#switchable-keyboard-layouts).
+</Tip>
+
+<Accordion title="follow_mouse values">
+- `0` — Cursor movement will not change focus.
+- `1` — Cursor movement will always change focus to the window under the cursor.
+- `2` — Cursor focus is detached from keyboard focus; clicking moves keyboard focus.
+- `3` — Cursor focus is completely separate; clicking does not change keyboard focus.
+</Accordion>
+
+### Touchpad
+
+**Category:** `input.touchpad`
+
+| Name | Description | Type | Default | Limits |
+| --- | --- | --- | --- | --- |
+| `clickfinger_behavior` | Map 1/2/3-finger taps to LMB/RMB/MMB | bool | `false` | |
+| `disable_while_typing` | Disable touchpad while typing | bool | `true` | |
+| `drag_3fg` | Enable three-finger drag | int | `0` | [0 – 2] |
+| `drag_lock` | Lifting finger won't drop drag: `0`=off, `1`=timeout, `2`=sticky | int | `0` | [0 – 2] |
+| `flip_x` | Invert horizontal movement | bool | `false` | |
+| `flip_y` | Invert vertical movement | bool | `false` | |
+| `middle_button_emulation` | LMB + RMB simultaneously = MMB | bool | `false` | |
+| `natural_scroll` | Invert scrolling direction | bool | `false` | |
+| `scroll_factor` | Scroll movement multiplier | float | `1.0` | [0.0 – 100] |
+| `tap_and_drag` | Enable tap-and-drag | bool | `true` | |
+| `tap_button_map` | Tap button mapping: `"lrm"` or `"lmr"` | string | `[[Empty]]` | |
+| `tap_to_click` | Tap to click (1/2/3 fingers = LMB/RMB/MMB) | bool | `true` | |
+
+### Touchdevice
+
+**Category:** `input.touchdevice`
+
+| Name | Description | Type | Default | Limits |
+| --- | --- | --- | --- | --- |
+| `enabled` | Enable input for touch devices | bool | `true` | |
+| `output` | Monitor to bind touch devices to | string | `[[Auto]]` | |
+| `transform` | Input transform (same values as monitor transforms) | int | `0` | [0 – 6] |
+
+### Tablet
+
+**Category:** `input.tablet`
+
+| Name | Description | Type | Default | Limits |
+| --- | --- | --- | --- | --- |
+| `enabled` | Enable input for tablets | bool | `true` | |
+| `output` | Monitor to bind tablet to (`"current"` or monitor name) | string | `[[Empty]]` | |
+| `transform` | Input transform | int | `0` | [0 – 6] |
+| `absolute_region_position` | Treat `region_position` as absolute in monitor layout | bool | `false` | |
+| `active_area_position` | Position of active area in mm | vec2 | `{0, 0}` | |
+| `active_area_size` | Size of tablet active area in mm | vec2 | `{0, 0}` | |
+| `left_handed` | Rotate tablet 180° | bool | `false` | |
+| `region_position` | Position of mapped region relative to bound monitor | vec2 | `{0, 0}` | |
+| `region_size` | Size of mapped region (`{0,0}` = unset) | vec2 | `{0, 0}` | |
+| `relative_input` | Use relative input | bool | `false` | |
+
+### Virtual Keyboard
+
+**Category:** `input.virtualkeyboard`
+
+| Name | Description | Type | Default | Limits |
+| --- | --- | --- | --- | --- |
+| `release_pressed_on_close` | Release all pressed keys when virtual keyboard closes | bool | `false` | |
+| `share_states` | Unify key and modifier states with other keyboards: `0`=no, `1`=yes, `2`=yes unless IME | int | `2` | [0 – 2] |
+
+---
+
+## Gestures
+
+**Category:** `gestures`
+
+| Name | Description | Type | Default | Limits |
+| --- | --- | --- | --- | --- |
+| `close_max_timeout` | Timeout for 1:1 close gesture in ms | int | `1000` | [10 – 2000] |
+| `workspace_swipe_cancel_ratio` | How far a swipe must proceed to commit (0–1) | float | `0.5` | [0.0 – 1.0] |
+| `workspace_swipe_create_new` | Create a new workspace when swiping past the last one | bool | `true` | |
+| `workspace_swipe_direction_lock` | Lock swipe direction after crossing the threshold | bool | `true` | |
+| `workspace_swipe_direction_lock_threshold` | Distance in pixels before direction lock activates | int | `10` | [0 – 200] |
+| `workspace_swipe_distance` | Touchpad gesture distance in pixels | int | `300` | [0 – 2000] |
+| `workspace_swipe_forever` | Allow swiping past neighboring workspaces | bool | `false` | |
+| `workspace_swipe_invert` | Invert swipe direction (touchpad only) | bool | `true` | |
+| `workspace_swipe_min_speed_to_force` | Minimum speed to force workspace switch | int | `30` | [0 – 200] |
+| `workspace_swipe_touch` | Enable workspace swiping from touchscreen edge | bool | `false` | |
+| `workspace_swipe_touch_invert` | Invert swipe direction (touchscreen only) | bool | `false` | |
+| `workspace_swipe_use_r` | Use `r` prefix instead of `m` for workspace finding | bool | `false` | |
+
+**Category:** `gestures.scrolling`
+
+| Name | Description | Type | Default |
+| --- | --- | --- | --- |
+| `move_snap_to_grid` | Snap scroll move gesture to grid on release | bool | `true` |
+| `move_snap_cursor` | Snap cursor to newly focused window on release | bool | `true` |
+
+---
+
+## Group
+
+**Category:** `group`
+
+| Name | Description | Type | Default | Limits |
+| --- | --- | --- | --- | --- |
+| `auto_group` | Auto-group new windows into the focused unlocked group | bool | `true` | |
+| `drag_into_group` | Dragging a window into a group merges them: `0`=off, `1`=on, `2`=groupbar only | int | `1` | [0 – 2] |
+| `focus_removed_window` | Focus the window just moved out of a group | bool | `true` | |
+| `group_on_movetoworkspace` | Merge window into the workspace's solitary unlocked group on move | bool | `false` | |
+| `insert_after_current` | New group windows spawn after the current one (not at tail) | bool | `true` | |
+| `merge_floated_into_tiled_on_groupbar` | Merge floating windows dragged onto a tiled groupbar | bool | `false` | |
+| `merge_groups_on_drag` | Allow groups to be dragged into other groups | bool | `true` | |
+| `merge_groups_on_groupbar` | Merge groups when one is dragged onto another's groupbar | bool | `true` | |
+
+### Group Colors
+
+**Category:** `group.col`
+
+| Name | Description | Type | Default |
+| --- | --- | --- | --- |
+| `border_active` | Active group border color | gradient | `0x66ffff00` |
+| `border_inactive` | Inactive group border color | gradient | `0x66777700` |
+| `border_locked_active` | Active locked group border color | gradient | `0x66ff5500` |
+| `border_locked_inactive` | Inactive locked group border color | gradient | `0x66775500` |
+
+### Groupbar
+
+**Category:** `group.groupbar`
+
+| Name | Description | Type | Default | Limits |
+| --- | --- | --- | --- | --- |
+| `enabled` | Enable groupbars | bool | `true` | |
+| `blur` | Apply blur to groupbar indicators | bool | `false` | |
+| `disable_when_only` | Disable groupbar for single-window groups | bool | `false` | |
+| `font_family` | Font for groupbar titles | string | `[[Empty]]` | |
+| `font_size` | Font size of groupbar title | int | `8` | [2 – 64] |
+| `font_weight_active` | Font weight of active title | font_weight | `"normal"` | |
+| `font_weight_inactive` | Font weight of inactive title | font_weight | `"normal"` | |
+| `gradients` | Enable gradient backgrounds | bool | `false` | |
+| `height` | Height of the groupbar | int | `14` | [0 – 64] |
+| `indicator_height` | Height of the groupbar indicator | int | `3` | [0 – 64] |
+| `middle_click_close` | Close clicked window with middle click | bool | `true` | |
+| `render_titles` | Render titles in the groupbar | bool | `true` | |
+| `rounding` | Indicator rounding amount | int | `1` | [0 – 40] |
+| `scrolling` | Scroll in groupbar changes active window | bool | `true` | |
+| `stacked` | Render groupbar as a vertical stack | bool | `false` | |
+| `text_color` | Window title color | color | `0xffffffff` | |
+
+---
+
+## Misc
+
+**Category:** `misc`
+
+| Name | Description | Type | Default | Limits |
+| --- | --- | --- | --- | --- |
+| `allow_session_lock_restore` | Allow restarting a crashed lock screen app | bool | `false` | |
+| `animate_manual_resizes` | Animate manual window resizes | bool | `false` | |
+| `animate_mouse_windowdragging` | Animate windows dragged by mouse | bool | `false` | |
+| `background_color` | Background color (requires `disable_hyprland_logo`) | color | `0x111111` | |
+| `close_special_on_empty` | Close special workspace when last window is removed | bool | `true` | |
+| `disable_autoreload` | Do not auto-reload config on save | bool | `false` | |
+| `disable_hyprland_logo` | Disable the random Hyprland background | bool | `false` | |
+| `disable_splash_rendering` | Disable splash text rendering | bool | `false` | |
+| `enable_anr_dialog` | Show ANR dialog for hung applications | bool | `true` | |
+| `enable_swallow` | Enable window swallowing | bool | `false` | |
+| `focus_on_activate` | Focus apps that request activation | bool | `false` | |
+| `font_family` | Global default font | string | `"Sans"` | |
+| `key_press_enables_dpms` | Wake monitors on key press if DPMS is off | bool | `false` | |
+| `layers_hog_keyboard_focus` | Keyboard-interactive layers keep focus on mouse move | bool | `true` | |
+| `middle_click_paste` | Enable middle-click paste (primary selection) | bool | `true` | |
+| `mouse_move_enables_dpms` | Wake monitors on mouse move if DPMS is off | bool | `false` | |
+| `mouse_move_focuses_monitor` | Focus monitor when mouse moves into it | bool | `true` | |
+| `render_unfocused_fps` | Max FPS for unfocused background windows | int | `15` | [1 – 120] |
+| `swallow_regex` | Class regex for windows that swallow terminals | string | `[[Empty]]` | |
+| `swallow_exception_regex` | Title regex for windows that should NOT be swallowed | string | `[[Empty]]` | |
+| `vrr` | VRR (Adaptive Sync): `0`=off, `1`=on, `2`=fullscreen only, `3`=fullscreen with game/video | int | `0` | [0 – 3] |
+
+---
+
+## Binds
+
+**Category:** `binds`
+
+| Name | Description | Type | Default | Limits |
+| --- | --- | --- | --- | --- |
+| `allow_pin_fullscreen` | Allow fullscreen on pinned windows, restore pin after | bool | `false` | |
+| `allow_workspace_cycles` | Switching to current workspace goes to previous | bool | `false` | |
+| `disable_keybind_grabbing` | Prevent apps (e.g. VMs) from disabling keybinds | bool | `false` | |
+| `drag_threshold` | Pixel distance before drag/click flags activate | int | `0` | [0 – ...] |
+| `focus_preferred_method` | `0`=recent window priority, `1`=longer shared edges | int | `0` | [0 – 1] |
+| `hide_special_on_workspace_change` | Hide special workspace when changing active workspace | bool | `false` | |
+| `ignore_group_lock` | Ignore group lock for move into/out of group dispatchers | bool | `false` | |
+| `movefocus_cycles_fullscreen` | Allow `focus({ direction })` to seek windows from fullscreen | bool | `false` | |
+| `movefocus_cycles_groupfirst` | In grouped window, `focus({ direction })` cycles group tabs first | bool | `false` | |
+| `pass_mouse_when_bound` | Pass mouse events to apps when a keybind triggers | bool | `false` | |
+| `scroll_event_delay` | Cooldown between scroll events used for binds (ms) | int | `300` | [0 – 2000] |
+| `window_direction_monitor_fallback` | Moving focus/window past monitor edge moves it to next monitor | bool | `true` | |
+| `workspace_back_and_forth` | Switching to current workspace goes back: `0`=off, `1`=on, `2`=per monitor | int | `0` | [0 – 2] |
+| `workspace_center_on` | On workspace switch, center cursor on workspace (`0`) or last active window (`1`) | int | `1` | [0 – 1] |
+
+---
+
+## Cursor
+
+**Category:** `cursor`
+
+| Name | Description | Type | Default | Limits |
+| --- | --- | --- | --- | --- |
+| `default_monitor` | Default monitor for cursor on startup | string | `[[Empty]]` | |
+| `enable_hyprcursor` | Enable hyprcursor support | bool | `true` | |
+| `hide_on_key_press` | Hide cursor on key press until mouse moves | bool | `false` | |
+| `hide_on_tablet` | Hide cursor when last input was from a tablet | bool | `false` | |
+| `hide_on_touch` | Hide cursor when last input was touch | bool | `true` | |
+| `inactive_timeout` | Seconds of inactivity before hiding cursor (`0`=never) | float | `0` | [0 – 20] |
+| `no_hardware_cursors` | `0`=use HW if possible, `1`=disable, `2`=auto | int | `2` | [0 – 2] |
+| `no_warps` | Disable cursor warping in most cases | bool | `false` | |
+| `persistent_warps` | Return cursor to last position relative to refocused window | bool | `false` | |
+| `warp_on_change_workspace` | Move cursor to last focused window after workspace change | int | `0` | [0 – 2] |
+| `zoom_factor` | Screen magnification factor (1.0 = none) | float | `1.0` | [1 – 10] |
+| `zoom_rigid` | Zoom follows cursor rigidly (always centered) | bool | `false` | |
+
+---
+
+## Xwayland
+
+**Category:** `xwayland`
+
+| Name | Description | Type | Default |
+| --- | --- | --- | --- |
+| `enabled` | Allow X11 applications via Xwayland | bool | `true` |
+| `create_abstract_socket` | Create abstract Unix socket for Xwayland | bool | `false` |
+| `force_zero_scaling` | Force scale 1 on Xwayland windows on scaled displays | bool | `false` |
+| `use_nearest_neighbor` | Nearest-neighbor filtering for Xwayland apps (pixelated, not blurry) | bool | `true` |
+
+---
+
+## Render
+
+**Category:** `render`
+
+| Name | Description | Type | Default | Limits |
+| --- | --- | --- | --- | --- |
+| `async_commit` | Send DRM commits asynchronously to reduce cursor latency | bool | `false` | |
+| `cm_auto_hdr` | Auto-switch to HDR in fullscreen: `0`=off, `1`=hdr, `2`=hdredid | int | `1` | [0 – 2] |
+| `cm_enabled` | Enable color management pipeline (requires restart) | bool | `true` | |
+| `direct_scanout` | Enable direct scanout for fullscreen apps: `0`=off, `1`=on, `2`=auto | int | `0` | [0 – 2] |
+| `expand_undersized_textures` | Expand undersized textures along edge rather than stretching | bool | `true` | |
+| `new_render_scheduling` | Use triple buffering when needed | bool | `false` | |
+| `xp_mode` | Disable back buffer and bottom layer rendering | bool | `false` | |
+
+---
+
+## Ecosystem
+
+**Category:** `ecosystem`
+
+| Name | Description | Type | Default |
+| --- | --- | --- | --- |
+| `enforce_permissions` | Enable permission control | bool | `false` |
+| `no_donation_nag` | Disable the twice-yearly donation popup | bool | `false` |
+| `no_update_news` | Disable update news popup | bool | `false` |
+
+---
+
+## Debug
+
+<Warning>
+These settings are intended only for development and testing. Do not change them in your normal configuration.
+</Warning>
+
+**Category:** `debug`
+
+| Name | Description | Type | Default |
+| --- | --- | --- | --- |
+| `colored_stdout_logs` | Enable colors in stdout logs | bool | `true` |
+| `damage_blink` | Flash areas updated with damage tracking (epilepsy warning!) | bool | `false` |
+| `damage_tracking` | Redraw only needed display areas: `0`=none, `1`=monitor, `2`=full | int | `2` |
+| `disable_logs` | Disable file logging | bool | `true` |
+| `enable_stdout_logs` | Enable logging to stdout | bool | `false` |
+| `error_limit` | Limit number of displayed config errors | int | `5` |
+| `error_position` | Error bar position: `0`=top, `1`=bottom | int | `0` |
+| `gl_debugging` | Enable OpenGL debug (requires restart) | bool | `false` |
+| `overlay` | Print performance overlay (disable VFR for accuracy) | bool | `false` |
+| `suppress_errors` | Suppress config file parsing error display | bool | `false` |
+| `vfr` | Variable frame rate — leave enabled to conserve resources | bool | `true` |

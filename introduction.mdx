@@ -1,0 +1,62 @@
+---
+title: "Hyprland: Dynamic Tiling Wayland Compositor Overview"
+sidebarTitle: "Introduction"
+description: "Discover what Hyprland is, how it differs from traditional window managers, and why its Wayland-native, GPU-accelerated design makes it stand out."
+---
+
+Hyprland is a dynamic tiling Wayland compositor — not a window manager bolted on top of an X server, but a fully autonomous display server that owns the entire graphics stack. It renders every pixel itself using GPU-accelerated OpenGL/Vulkan rendering, handles input, manages windows in a dynamic tiling layout, and exposes a rich IPC interface — all in a single, cohesive program. If you have ever used a traditional X11 tiling window manager and wondered what the fuss about Wayland is, Hyprland is the answer.
+
+## What Makes Hyprland Different
+
+Unlike older compositors that inherited X11-era design decisions, Hyprland was built from the ground up for the modern Linux graphics stack. Its configuration is written in **Lua**, giving you the full expressive power of a real programming language instead of a bespoke DSL. Smooth animations, per-window blur, rounded corners, and shader effects are first-class features — not optional plugins.
+
+<CardGroup cols={2}>
+  <Card title="Installation" icon="download" href="/getting-started/installation">
+    Install Hyprland on Arch, NixOS, Fedora, Ubuntu, Alpine, Void, and more.
+  </Card>
+  <Card title="Master Tutorial" icon="map" href="/getting-started/master-tutorial">
+    Walk through launching Hyprland, configuring keybinds, and setting up your desktop from scratch.
+  </Card>
+  <Card title="Configuration" icon="sliders" href="/configuring">
+    Explore monitors, keybinds, window rules, animations, environment variables, and the full Lua API.
+  </Card>
+  <Card title="FAQ" icon="circle-question" href="/faq">
+    Find answers to the most common issues, from cursor themes to screen sharing.
+  </Card>
+</CardGroup>
+
+## Compositor vs. Window Manager
+
+On X11, a **window manager** and a **compositor** are two separate programs — the window manager positions windows, while the compositor handles blending and effects. On Wayland there is no such separation: the compositor _is_ the display server. It talks directly to the kernel via DRM/KMS and to clients via the Wayland protocol. There is no Xorg underneath it. This is why you cannot mix Wayland compositors the way you could swap X11 window managers.
+
+<Info>
+  A Wayland compositor is a fully autonomous display server, equivalent in scope to Xorg itself. It is **not** possible to mix-and-match Wayland compositors the way you could on Xorg.
+</Info>
+
+## Hyprland Is Not a Desktop Environment
+
+Hyprland intentionally ships without a file manager, system settings panel, notification daemon, status bar, or application launcher. It is a **toolkit** that gives you the primitives to assemble exactly the desktop environment you want. Every component — bar, lock screen, idle daemon, wallpaper renderer, portal — is your choice to install and configure.
+
+<Warning>
+  Apps, integrations, shells, and desktop services are **your** responsibility to pick, install, and configure. This wiki is very verbose — read it thoroughly before assuming something is broken or missing.
+</Warning>
+
+## Wayland Compatibility Notes
+
+Because Hyprland is pure Wayland, some legacy X11 applications will not work natively. Hyprland ships with **XWayland** support (unless explicitly compiled out), which runs X11 apps in a compatibility layer. However, it is not recommended to rely on all X11 applications working perfectly. See the [Useful Utilities](/useful-utilities) page for a curated list of Wayland-native replacements.
+
+<Note>
+  NVIDIA GPUs are often not usable out of the box. If you plan to use an NVIDIA card, follow the [NVIDIA page](/nvidia) **after** installing Hyprland. Proprietary driver quirks are NVIDIA's responsibility, not Hyprland's.
+</Note>
+
+## Versioned Wiki
+
+This wiki is versioned. By default you are reading the documentation for the **latest Hyprland git commit**. If you are running a tagged release (which is likely), check the version selector and select the matching version. You can confirm your installed version with:
+
+```bash
+hyprctl version
+```
+
+## Getting Help
+
+If you run into trouble, start with the [FAQ](/faq) and the [Configuring](/configuring) sections — the most common issues are documented there. You can also search [GitHub Discussions](https://github.com/hyprwm/Hyprland/discussions) or ask for help in the [Hyprland Discord](https://discord.gg/hQ9XvMUjjr).

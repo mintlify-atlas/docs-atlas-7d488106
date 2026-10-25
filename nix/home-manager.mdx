@@ -1,0 +1,311 @@
+---
+title: "Configuring Hyprland Declaratively with Home Manager"
+sidebarTitle: Home Manager
+description: Use Home Manager's wayland.windowManager.hyprland module to declaratively configure Hyprland, manage plugins, and integrate with the NixOS module.
+---
+
+Home Manager provides a dedicated `wayland.windowManager.hyprland` module that lets you configure Hyprland entirely through Nix expressions. This covers keybinds, settings, environment variables, plugins, and systemd integration — all version-controlled and reproducible. This page explains how to enable the module, wire it up to the Hyprland flake, manage plugins from Nixpkgs or the upstream `hyprland-plugins` repository, and fix common issues.
+
+<Warning>
+  **Required:** The **NixOS module** (`programs.hyprland.enable = true`) enables critical system-level components, including the session file for your display manager. Without it you may not be able to log in to Hyprland from a display manager.
+
+  **Optional:** The **Home Manager module** (`wayland.windowManager.hyprland.enable = true`) lets you configure Hyprland declaratively through Home Manager. It adds Hyprland to your user's `$PATH` and manages your config, but does not create the session file — that is handled by the NixOS module.
+</Warning>
+
+For a full list of available options, see the [Home Manager option reference](https://nix-community.github.io/home-manager/options.xhtml#opt-wayland.windowManager.hyprland.enable).
+
+## Installation
+
+<Tabs>
+  <Tab title="Home Manager (Nixpkgs)">
+    Enable the module in your `home.nix`. This uses the Hyprland version from Nixpkgs.
+
+    ```nix
+    # home.nix
+    {
+      wayland.windowManager.hyprland.enable = true;
+    }
+    ```
+  </Tab>
+  <Tab title="Hyprland Flake">
+    The following shows how to wire the Hyprland flake into Home Manager. Replace `user@hostname` with your own values.
+
+    ```nix
+    # flake.nix
+    {
+      inputs = {
+        nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+
+        home-manager = {
+          url = "github:nix-community/home-manager";
+          inputs.nixpkgs.follows = "nixpkgs";
+        };
+
+        hyprland.url = "github:hyprwm/Hyprland";
+      };
+
+      outputs = { nixpkgs, home-manager, hyprland, ... }: {
+        homeConfigurations."user@hostname" = home-manager.lib.homeManagerConfiguration {
+          pkgs = nixpkgs.legacyPackages.x86_64-linux;
+
+          modules = [
+            {
+              wayland.windowManager.hyprland = {
+                enable = true;
+                # set the flake package
+                package = inputs.hyprland.packages.${pkgs.stdenv.hostPlatform.system}.hyprland;
+                portalPackage = inputs.hyprland.packages.${pkgs.stdenv.hostPlatform.system}.xdg-desktop-portal-hyprland;
+              };
+            }
+            # ...
+          ];
+        };
+      };
+    }
+    ```
+  </Tab>
+  <Tab title="flake-compat">
+    Use the Hyprland flake package in a system that does not have flakes enabled.
+
+    <Warning>
+      The flake module is mainly used as a staging area for new options. Unless you are testing new features, prefer the downstream Home Manager module.
+    </Warning>
+
+    ```nix
+    # home.nix
+    { pkgs, ... }: let
+      flake-compat = builtins.fetchTarball "https://github.com/edolstra/flake-compat/archive/master.tar.gz";
+
+      hyprland = (import flake-compat {
+        src = builtins.fetchTarball "https://github.com/hyprwm/Hyprland/archive/main.tar.gz";
+      }).defaultNix;
+    in {
+      wayland.windowManager.hyprland = {
+        enable = true;
+        package = hyprland.packages.${pkgs.stdenv.hostPlatform.system}.hyprland;
+        portalPackage = hyprland.packages.${pkgs.stdenv.hostPlatform.system}.xdg-desktop-portal-hyprland;
+      };
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Writing Your Configuration
+
+Once enabled, use `wayland.windowManager.hyprland.settings` to configure Hyprland declaratively. The settings attrset maps directly to Hyprland config options.
+
+```nix
+# home.nix
+{
+  wayland.windowManager.hyprland.settings = {
+    "$mod" = "SUPER";
+    bind =
+      [
+        "$mod, F, exec, firefox"
+        ", Print, exec, grimblast copy area"
+      ]
+      ++ (
+        # workspaces
+        # binds $mod + [shift +] {1..9} to [move to] workspace {1..9}
+        builtins.concatLists (builtins.genList (i:
+            let ws = i + 1;
+            in [
+              "$mod, code:1${toString i}, workspace, ${toString ws}"
+              "$mod SHIFT, code:1${toString i}, movetoworkspace, ${toString ws}"
+            ]
+          )
+          9)
+      );
+  };
+}
+```
+
+## Managing Plugins
+
+Hyprland plugins are managed differently on Nix. The `hyprpm` tool is unsupported; instead, plugins are declared via the `plugins` option in the Home Manager module.
+
+<Note>
+  Using the plugin syntax below requires the Home Manager module or the upstream NixOS module to be enabled.
+</Note>
+
+### Plugins from Nixpkgs
+
+Nixpkgs ships several Hyprland plugins built against its bundled Hyprland version:
+
+```nix
+# home.nix
+{ pkgs, ... }: {
+  wayland.windowManager.hyprland.plugins = [
+    pkgs.hyprlandPlugins.<plugin>
+  ];
+}
+```
+
+Run `nix search nixpkgs#hyprlandPlugins ^` to see which plugins are available.
+
+### Official Plugins (`hyprland-plugins`)
+
+These are official plugins maintained by vaxry. Using them requires the Hyprland flake (not the Nixpkgs package) to avoid version mismatches.
+
+<Steps>
+  <Step title="Add hyprland-plugins to your flake inputs">
+    ```nix
+    # flake.nix
+    {
+      inputs = {
+        hyprland.url = "github:hyprwm/Hyprland";
+
+        hyprland-plugins = {
+          url = "github:hyprwm/hyprland-plugins";
+          inputs.hyprland.follows = "hyprland";
+        };
+      };
+    }
+    ```
+
+    The `inputs.hyprland.follows` line pins `hyprland-plugins` to the exact same Hyprland revision, eliminating version mismatches.
+  </Step>
+  <Step title="Add plugins to your Home Manager config">
+    ```nix
+    # home.nix
+    { inputs, pkgs, ... }: {
+      wayland.windowManager.hyprland = {
+        enable = true;
+
+        plugins = [
+          inputs.hyprland-plugins.packages.${pkgs.stdenv.hostPlatform.system}.<plugin>
+        ];
+      };
+    }
+    ```
+  </Step>
+</Steps>
+
+### Custom Plugins with `mkHyprlandPlugin`
+
+Any plugin can be packaged with the `mkHyprlandPlugin` helper. It wraps `stdenv.mkDerivation` with Hyprland's build environment pre-configured. Here is an example using hy3:
+
+```nix
+# plugin.nix
+{
+  lib,
+  fetchFromGitHub,
+  cmake,
+  hyprland,
+  hyprlandPlugins,
+}:
+hyprlandPlugins.mkHyprlandPlugin (finalAttrs: {
+  pluginName = "hy3";
+  version = "0.39.1";
+
+  src = fetchFromGitHub {
+    owner = "outfoxxed";
+    repo = "hy3";
+    rev = "hl${finalAttrs.version}";
+    hash = "sha256-PqVld+oFziSt7VZTNBomPyboaMEAIkerPQFwNJL/Wjw=";
+  };
+
+  nativeBuildInputs = [cmake];
+  buildInputs = [];
+
+  meta = {
+    homepage = "https://github.com/outfoxxed/hy3";
+    description = "Hyprland plugin for an i3 / sway like manual tiling layout";
+    license = lib.licenses.gpl3;
+    platforms = lib.platforms.linux;
+  };
+})
+```
+
+Then use it in your Home Manager config:
+
+```nix
+# home.nix
+{ pkgs, ... }: {
+  wayland.windowManager.hyprland.plugins = [
+    (pkgs.callPackage ./plugin.nix {})
+  ];
+}
+```
+
+## FAQ
+
+<Accordion title="Using the Home Manager module alongside the NixOS module">
+  If you want to use the Home Manager module while also enabling the NixOS module, set `package` and `portalPackage` to `null` so Home Manager defers to the packages defined in the NixOS module. This requires Home Manager commit `5dc1c2e40410f7dabef3ba8bf4fdb3145eae3ceb` or later.
+
+  ```nix
+  # home.nix
+  {
+    wayland.windowManager.hyprland = {
+      enable = true;
+      # set both to null to use the packages from the NixOS module
+      package = null;
+      portalPackage = null;
+    };
+  }
+  ```
+
+  Make sure **not** to mix Hyprland and XDPH versions. If your NixOS module uses the flake, your Home Manager module should as well (or both should be `null`).
+</Accordion>
+
+<Accordion title="Programs don't work in systemd services but do in the terminal">
+  This happens because systemd does not inherit your shell's `PATH` by default. Services such as `hypridle` will fail to find executables.
+
+  Fix it by exporting all environment variables to systemd at startup:
+
+  ```nix
+  # home.nix
+  {
+    wayland.windowManager.hyprland.systemd.variables = ["--all"];
+  }
+  ```
+
+  This produces the following entry in your Hyprland config:
+
+  ```lua
+  hl.on("hyprland.start", function()
+      hl.exec_cmd("dbus-update-activation-environment --systemd --all")
+  end)
+  ```
+
+  If you are not using the Home Manager module, add the `exec_cmd` line above directly to your `hyprland.lua`.
+</Accordion>
+
+<Accordion title="Mouse cursors, icons, or GTK themes don't load correctly">
+  Use `home.pointerCursor` and `gtk.theme` in your Home Manager config, which enable compatibility hooks that ensure themes are applied in all situations:
+
+  ```nix
+  # home.nix
+  {
+    home.pointerCursor = {
+      gtk.enable = true;
+      package = pkgs.bibata-cursors;
+      name = "Bibata-Modern-Classic";
+      size = 16;
+    };
+
+    gtk = {
+      enable = true;
+
+      theme = {
+        package = pkgs.flat-remix-gtk;
+        name = "Flat-Remix-GTK-Grey-Darkest";
+      };
+
+      iconTheme = {
+        package = pkgs.adwaita-icon-theme;
+        name = "Adwaita";
+      };
+
+      font = {
+        name = "Sans";
+        size = 11;
+      };
+    };
+  }
+  ```
+</Accordion>
+
+## Hjem Integration
+
+Hjem is a simpler alternative to Home Manager focused purely on file linking, without the full module ecosystem. See the [NixOS page](/nix/nixos) for Hjem usage examples, including writing `hyprland.lua` inline with Nix string interpolation and linking existing config files.

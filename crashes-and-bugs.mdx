@@ -1,0 +1,281 @@
+---
+title: "Debugging Hyprland Crashes, Bugs, and Log Collection"
+sidebarTitle: "Crashes & Bugs"
+description: "How to collect Hyprland logs, crash reports, and debug stacktraces, and exactly what to do when Hyprland crashes at or after launch."
+---
+
+When something goes wrong with Hyprland — whether it is a crash at startup, a random freeze, or a graphical glitch — the first step is always to gather information. This page walks you through every method available for capturing logs, crash reports, stacktraces, and DRM-level diagnostics so that you (or a maintainer) can identify the root cause.
+
+## Getting the Log
+
+Logging must be enabled before a session for startup messages to be captured. Set `debug.disable_logs` to `false` in your config. If you also need OpenGL debug messages, set `debug.gl_debugging` to `true`.
+
+<Warning>
+  Remember to unset these options when you are done debugging. Both options negatively impact runtime performance and can produce very large files.
+</Warning>
+
+<Tip>
+  Debug logging can be toggled at runtime without restarting Hyprland. Use `hyprctl eval` to change the option on the fly. If you only need to see post-startup logs, enable debug options this way rather than in your config file — you can then simply reload your config to turn logging off when finished.
+</Tip>
+
+**Retrieving the log from a TTY** (when the last Hyprland session crashed):
+
+```sh
+cat $XDG_RUNTIME_DIR/hypr/$(ls -t $XDG_RUNTIME_DIR/hypr/ | head -n 1)/hyprland.log
+```
+
+**Retrieving the previous session's log from inside a running Hyprland session:**
+
+```sh
+cat $XDG_RUNTIME_DIR/hypr/$(ls -t $XDG_RUNTIME_DIR/hypr/ | head -n 2 | tail -n 1)/hyprland.log
+```
+
+For live log tailing during a running debug session:
+
+```sh
+watch -n 0.1 "grep -v \"arranged\" $XDG_RUNTIME_DIR/hypr/$HYPRLAND_INSTANCE_SIGNATURE/hyprland.log | tail -n 40"
+```
+
+Replace `hyprland` with `hyprlandd` for debug builds.
+
+## Obtaining the Crash Report
+
+Hyprland writes a crash report file whenever it exits abnormally.
+
+- If `$XDG_CACHE_HOME` is set, crash reports are in `$XDG_CACHE_HOME/hyprland`.
+- Otherwise, they are in `$HOME/.cache/hyprland`.
+
+Inside that directory, look for a file named `hyprlandCrashReport[XXXX].txt`, where `[XXXX]` is the PID of the crashed process. Attach this file when reporting an issue.
+
+## Crashes at Launch
+
+When Hyprland fails to start, check the log and match the message to one of the following cases:
+
+- **`backend failed to start`** — Launch from a TTY and inspect the lines printed in red.
+- **`Monitor X has NO PREFERRED MODE, and an INVALID one was requested`** — The monitor reported an invalid configuration. Try a different mode or cable.
+- **Any other message** — Check the coredump. Run `coredumpctl`, identify the most recent entry's PID, then run `coredumpctl info PID`.
+- **Failure attributed to a driver** (e.g., `radeon`) — Report an issue against that driver or the Hyprland project as appropriate.
+- **Failure attributed to `Hyprland` itself** — Report an issue on GitHub.
+
+## Crashes Not at Launch
+
+If Hyprland crashes during normal use, report the issue on [GitHub](https://github.com/hyprwm/Hyprland) or in the [Discord server](https://discord.gg/hQ9XvMUjjr). Attach the crash report and log described above.
+
+<Note>
+  Before reporting, check the [FAQ](/faq) — many crashes have a known cause and solution already documented there.
+</Note>
+
+## Obtaining a Debug Stacktrace
+
+<Note>
+  This procedure requires systemd (`coredumpctl`).
+</Note>
+
+<Steps>
+  <Step title="Build Hyprland in debug mode">
+    In your cloned Hyprland repository, run:
+
+    ```sh
+    make debug
+    ```
+  </Step>
+
+  <Step title="Reproduce the crash">
+    Start Hyprland from the debug build and perform the actions that trigger the crash.
+  </Step>
+
+  <Step title="Open the coredump with GDB">
+    From a TTY or terminal, run:
+
+    ```sh
+    coredumpctl debug Hyprland
+    ```
+
+    If GDB asks whether to load symbols, answer `y`. If it asks about paging output, answer `c`.
+  </Step>
+
+  <Step title="Enable GDB file logging">
+    Once you reach the `(gdb)` prompt, enable log output:
+
+    ```
+    set logging enabled
+    ```
+
+    To write to a specific file instead of the default location:
+
+    ```
+    set logging file output.log
+    ```
+  </Step>
+
+  <Step title="Capture the full backtrace">
+    Run the backtrace command, then exit:
+
+    ```
+    bt -full
+    exit
+    ```
+
+    Attach the resulting log file to your bug report.
+  </Step>
+</Steps>
+
+## Obtaining a Trace Log
+
+For very verbose runtime logging, launch Hyprland with the following environment variables set:
+
+```sh
+HYPRLAND_TRACE=1 AQ_TRACE=1 Hyprland
+```
+
+<Warning>
+  Trace logging is extremely verbose and will cause slowdowns and very large log files. Enable it only when actively debugging. Reproduce your issue as quickly as possible to keep the log manageable.
+</Warning>
+
+## Bisecting an Issue
+
+Bisecting finds the exact git commit that introduced a regression using binary search. This is helpful when a bug appeared after an update and you want to identify the responsible change.
+
+<Steps>
+  <Step title="Clone the Hyprland repository">
+    ```sh
+    git clone --recursive https://github.com/hyprwm/Hyprland
+    cd Hyprland
+    ```
+  </Step>
+
+  <Step title="Start the bisect session">
+    ```sh
+    git bisect start
+    ```
+  </Step>
+
+  <Step title="Mark the known good and bad commits">
+    Mark the last commit where the bug was **not** present:
+
+    ```sh
+    git bisect good [good commit]
+    ```
+
+    Mark the commit where the bug **is** present (you can use `HEAD`):
+
+    ```sh
+    git bisect bad HEAD
+    ```
+
+    Git will now check out a commit in the middle of that range.
+  </Step>
+
+  <Step title="Build and test each commit">
+    Reset, build, and run the binary from the TTY:
+
+    ```sh
+    git reset --hard --recurse-submodules
+    make all
+    ./build/Hyprland
+    ```
+
+    If the bug is **absent**, mark it good:
+
+    ```sh
+    git bisect good
+    ```
+
+    If the bug is **present**, mark it bad:
+
+    ```sh
+    git bisect bad
+    ```
+
+    If the build fails entirely, skip the commit:
+
+    ```sh
+    git bisect skip
+    ```
+
+    Repeat until Git identifies the first bad commit:
+
+    ```
+    [commit hash] is the first bad commit
+    ```
+  </Step>
+</Steps>
+
+## Building with AddressSanitizer (ASan)
+
+If requested by a maintainer, this procedure provides the deepest level of memory diagnostics available.
+
+<Warning>
+  Run this in a TTY with no Hyprland instances running.
+</Warning>
+
+<Steps>
+  <Step title="Clone Hyprland and build with ASan">
+    ```sh
+    git clone --recursive https://github.com/hyprwm/Hyprland
+    cd Hyprland
+    make asan
+    ```
+  </Step>
+
+  <Step title="Reproduce the crash">
+    Run the resulting binary and trigger the crash. Hyprland will exit back to the TTY.
+  </Step>
+
+  <Step title="Collect the ASan log files">
+    Search for files named `asan.log.XXXXX` (where `XXXXX` is a number) in your current working directory, `~`, or `./build`. Zip all of them together and attach to your issue.
+  </Step>
+</Steps>
+
+## Debugging DRM Issues
+
+DRM (Direct Rendering Manager) is the kernel subsystem that takes a rendered GPU buffer and displays it on screen. Freezes, glitches, and blank monitors can stem from issues in Hyprland's communication with DRM, the driver, or the kernel.
+
+<Warning>
+  DRM logs are **extremely verbose**. Reproduce your bug as quickly as possible after enabling logging to avoid generating a multi-gigabyte file.
+</Warning>
+
+<Steps>
+  <Step title="Enable verbose DRM logging">
+    ```sh
+    echo 0x19F | sudo tee /sys/module/drm/parameters/debug
+    ```
+  </Step>
+
+  <Step title="Clear and begin capturing kernel logs">
+    ```sh
+    sudo dmesg -C
+    dmesg -w > ~/dmesg.log &
+    ```
+  </Step>
+
+  <Step title="Run Hyprland and reproduce the issue">
+    ```sh
+    Hyprland
+    ```
+
+    Reproduce the issue, then quit Hyprland.
+  </Step>
+
+  <Step title="Stop log capture and disable DRM debug logging">
+    Bring the background `dmesg` process to the foreground and stop it with `Ctrl+C`:
+
+    ```sh
+    fg
+    ```
+
+    Then disable DRM debug logging to restore normal performance:
+
+    ```sh
+    echo 0 | sudo tee /sys/module/drm/parameters/debug
+    ```
+  </Step>
+
+  <Step title="Attach the log to your report">
+    Attach `~/dmesg.log` to your GitHub issue or Discord report.
+  </Step>
+</Steps>
+
+## Reporting Bugs
+
+Before filing a report, **read the [FAQ](/faq)** — many apparent bugs are known issues with documented solutions. If your problem is not covered there, open a [discussion on GitHub](https://github.com/hyprwm/Hyprland/discussions) or ask in the [Discord server](https://discord.gg/hQ9XvMUjjr).

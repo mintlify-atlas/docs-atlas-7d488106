@@ -1,0 +1,118 @@
+---
+title: "Preconfigured Hyprland Setups and Community Dotfiles"
+sidebarTitle: "Preconfigured Setups"
+description: "Browse community dotfiles and DE-like configs for Hyprland — from minimal to feature-rich — with important warnings about deep system modifications."
+---
+
+Hyprland intentionally ships without a built-in desktop environment, which means building your ideal setup from scratch is entirely possible — but it takes time. If you would rather start from something fully assembled, the community has produced a range of high-quality preconfigured setups that bundle a status bar, launcher, lock screen, notification daemon, themes, and more into a single install script. This page documents the most widely used options.
+
+<Warning>
+  Many of these configurations **aggressively inject themselves** and modify your system at a deep level to ensure they can function as intended. If you plan to remove them later, this may be significantly harder than you expect. Even the configurations' own uninstall scripts (if provided) may not clean up after themselves fully. Install with care on a system you are willing to reconfigure.
+</Warning>
+
+## Actively Maintained Setups
+
+### Omarchy
+
+An opinionated Arch + Hyprland setup by DHH. Designed to be a complete, batteries-included Hyprland environment for developers.
+
+- [Website](https://omarchy.org/)
+
+### ML4W
+
+ML4W (My Linux 4 Work) by Stephan Raabe offers a polished, out-of-the-box DE-like experience. It includes simple GUI settings applications, pre-configured feature-rich panels, a welcome app, and much more. One of the most beginner-friendly starting points for Hyprland.
+
+- [Website](https://ml4w.com/os/)
+- [GitHub](https://github.com/mylinuxforwork/dotfiles)
+- [YouTube](https://www.youtube.com/@mylinuxforwork)
+
+### end\_4
+
+If you like Material Design styling and want a lot of great applications pre-configured, end-4's dotfiles are a strong choice. They require a small amount of tinkering to tailor to your hardware, but the results are visually impressive.
+
+- [GitHub](https://github.com/end-4/dots-hyprland)
+
+### HyDE
+
+HyDE by the HyDE Project is a popular minimal, clean, and aesthetic configuration well-suited to terminal power users. It is one of the most starred Hyprland dotfile repositories on GitHub.
+
+- [GitHub](https://github.com/HyDE-Project/HyDE)
+
+### Dank Linux
+
+Dank Linux is a desktop suite built around **DankMaterialShell** — a complete Material 3-inspired desktop shell. A single installer command transforms an existing installation of many popular distros into a fully themed Hyprland desktop complete with a bar, launcher, notifications, lock screen, control center, and automatic wallpaper-based theming.
+
+- [Website](https://danklinux.com/)
+- [GitHub](https://github.com/AvengeMedia/DankMaterialShell)
+
+### fufexan
+
+A well-crafted Nix-based dotfile set from a core Hyprland contributor.
+
+- [GitHub](https://github.com/fufexan/dotfiles)
+
+### coffebar
+
+A clean, minimal configuration focused on productivity.
+
+- [GitHub](https://github.com/coffebar/dotfiles)
+
+---
+
+## Notable but Outdated Configurations
+
+The following configurations are widely referenced and were popular in Hyprland's earlier days. They are no longer actively updated to track current Hyprland releases, so you may encounter compatibility issues. They are listed here for reference only.
+
+<Accordion title="JaKooLit">
+  JaKooLit's dotfiles were a feature-rich and well-maintained option with installation scripts for many distributions and a wide selection of themes.
+
+  - [GitHub](https://github.com/JaKooLit/Hyprland-Dots)
+  - [YouTube](https://www.youtube.com/@Ja.KooLit)
+</Accordion>
+
+<Accordion title="linuxmobile">
+  A visually polished dotfile set that gained popularity through YouTube showcases.
+
+  - [GitHub](https://github.com/linuxmobile/hyprland-dots)
+</Accordion>
+
+<Accordion title="flick0">
+  A minimal aurora-themed configuration.
+
+  - [GitHub](https://github.com/flick0/dotfiles)
+</Accordion>
+
+<Accordion title="iamverysimp1e">
+  A clean dotfile set from the early Hyprland community.
+
+  - [GitHub](https://github.com/1amSimp1e/dots)
+</Accordion>
+
+<Accordion title="notusknot">
+  A NixOS-based dotfile configuration.
+
+  - [GitHub](https://github.com/notusknot/dotfiles-nix)
+</Accordion>
+
+---
+
+## Before You Install Any Preconfigured Setup
+
+<CardGroup cols={2}>
+  <Card title="Read the setup's README in full" icon="book-open">
+    Every configuration has its own dependencies, supported distros, and quirks. Never run an install script without understanding what it does.
+  </Card>
+  <Card title="Check hardware compatibility" icon="microchip">
+    Many configs assume specific GPU drivers, screen resolutions, or input devices. Verify the setup works with your hardware before committing.
+  </Card>
+  <Card title="Test in a VM first" icon="server">
+    If you are unsure about a configuration's install script, try it in a virtual machine before running it on your main system.
+  </Card>
+  <Card title="Have a recovery plan" icon="rotate-left">
+    Since uninstall scripts may leave traces behind, back up your existing configuration files before installing anything.
+  </Card>
+</CardGroup>
+
+<Tip>
+  Even if you start with a preconfigured setup, it is worth reading through the [Master Tutorial](/getting-started/master-tutorial) and [Configuring](/configuring) pages. They explain how Hyprland's configuration system works, which will help you understand and modify whatever setup you choose.
+</Tip>

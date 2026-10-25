@@ -1,0 +1,133 @@
+---
+title: "Scrolling Layout: Infinite Tape Window Tiling in Hyprland"
+sidebarTitle: Scrolling
+description: "Hyprland's Scrolling layout places windows in columns on an infinite canvas, letting you pan horizontally through your workspace like a timeline."
+---
+
+Scrolling is a layout where windows are positioned on an infinitely growing tape of columns. Instead of splitting tiles within a fixed grid, each new window creates a new column (or joins an existing one) on a canvas that extends in the configured direction. The visible portion of the tape tracks the focused column, giving you a spatial, linear arrangement of all your windows. This layout is inspired by PaperWM and similar scrolling window managers.
+
+## How It Works
+
+Each column on the tape holds one or more windows stacked vertically. New windows open in their own column by default. You can then *consume* a window into an adjacent column or *expel* it back out to its own column. The viewport scrolls automatically to keep the focused column visible, and you can also pan the tape manually.
+
+<Tip>
+  Use `fullscreen_on_one_column = true` (the default) so that a lone window on a workspace always fills the entire screen, making Scrolling feel like a regular layout until you open a second window.
+</Tip>
+
+## Config
+
+All options below belong to the `scrolling` configuration category.
+
+| Name | Description | Type | Default | Limits |
+| --- | --- | --- | --- | --- |
+| `fullscreen_on_one_column` | When a single column exists on a workspace, it spans the entire screen | bool | `true` | |
+| `column_width` | Default width of a new column as a fraction of the monitor width | float | `0.5` | 0.1–1.0 |
+| `focus_fit_method` | How to bring a newly focused column into view: `0` = center the column, `1` = fit it into the visible area | int | `1` | 0–1 |
+| `follow_focus` | Automatically scroll the tape to bring the focused window into view | bool | `true` | |
+| `follow_min_visible` | Minimum fraction of the window that must be visible before auto-follow triggers. Hard inputs (clicks, binds) always follow regardless | float | `0.4` | 0.0–1.0 |
+| `explicit_column_widths` | Comma-separated list of preconfigured widths cycled by `colresize +conf/-conf` | string | `"0.333, 0.5, 0.667, 1.0"` | |
+| `wrap_focus` | Allow `hl.dsp.layout("focus l/r")` to wrap around at the start/end of the tape | bool | `true` | |
+| `wrap_swapcol` | Allow `hl.dsp.layout("swapcol l/r")` to wrap around at the start/end of the tape | bool | `true` | |
+| `direction` | Direction in which new windows appear and the tape grows | string | `"right"` | `"left"`, `"right"`, `"up"`, `"down"` |
+
+### Example Configuration
+
+```lua
+scrolling {
+    column_width            = 0.5
+    fullscreen_on_one_column = true
+    follow_focus            = true
+    follow_min_visible      = 0.4
+    explicit_column_widths  = "0.333, 0.5, 0.667, 1.0"
+    direction               = "right"
+}
+```
+
+## Workspace Rules
+
+Use `layout_opts` in a workspace rule to override `scrolling.direction` for a specific workspace:
+
+| Name | Description | Type |
+| --- | --- | --- |
+| `direction` | Same as `scrolling.direction`, but scoped to a single workspace | string |
+
+```lua
+hl.workspace_rule({ workspace = "2", layout_opts = { direction = "right" } })
+```
+
+## Window Rules
+
+Use the static `scrolling_width` rule to set an initial column width for a specific window:
+
+```lua
+hl.window_rule({
+    name           = "kitty_starting_width",
+    match          = { class = "kitty" },
+    scrolling_width = 0.5,
+})
+```
+
+## Layout Messages
+
+Layout messages are sent via `hl.dsp.layout()`. The following arguments are supported in Scrolling:
+
+### Navigation and Viewport
+
+| Name | Description | Params |
+| --- | --- | --- |
+| `focus` | Move focus and center the layout, wrapping instead of crossing to a neighboring monitor | direction (`l`, `r`, `u`, `d`) |
+| `center` | Center the currently focused column in the viewport | none |
+| `fit_into_view` | Fit the currently active column fully into the visible area | none |
+| `move` | Pan the tape by a relative logical pixel amount or by columns | `-200`, `+200` (px), or `+col`, `-col` |
+| `inhibit_scroll` | Prevent the viewport from moving for the active workspace | empty = toggle, or a `bool` to explicitly enable/disable |
+
+### Column Management
+
+| Name | Description | Params |
+| --- | --- | --- |
+| `colresize` | Resize the current column. Accepts an absolute value (`0.5`), a relative delta (`+0.2`, `-0.2`), cycle through preconfigured widths (`+conf`, `-conf`), or resize all columns at once with `all <number>` | relative float / `+conf` / `-conf` / `all <number>` |
+| `swapcol` | Swap the current column with its left (`l`) or right (`r`) neighbor. Wraps around if `wrap_swapcol` is enabled | `l` or `r` |
+| `fit` | Execute a fit operation. Available modes: `active`, `visible`, `all`, `toend`, `tobeg`, `expand` (expand current window to fill remaining free space) | fit mode |
+
+### Window Placement
+
+| Name | Description | Params |
+| --- | --- | --- |
+| `consume` | Move the current window into the previous column | none |
+| `expel` | Move the current window into its own new column (backward if in the top half, forward if in the bottom half) | none |
+| `promote` | Move the current window into its own new column in the forward direction | none |
+| `consume_or_expel` | Expel if the window is not alone in its column, consume if it is alone | `prev` or `next` |
+
+### Example Key Bindings
+
+```lua
+-- Navigate between columns
+hl.bind("SUPER + H",             hl.dsp.layout("focus l"))
+hl.bind("SUPER + L",             hl.dsp.layout("focus r"))
+
+-- Scroll the tape by one column at a time
+hl.bind("SUPER + period",        hl.dsp.layout("move +col"))
+hl.bind("SUPER + comma",         hl.dsp.layout("swapcol l"))
+
+-- Resize current column
+hl.bind("SUPER + SHIFT + H",     hl.dsp.layout("colresize -0.1"))
+hl.bind("SUPER + SHIFT + L",     hl.dsp.layout("colresize +0.1"))
+hl.bind("SUPER + SHIFT + Space", hl.dsp.layout("colresize +conf"))
+
+-- Move window between columns
+hl.bind("SUPER + C",             hl.dsp.layout("consume"))
+hl.bind("SUPER + E",             hl.dsp.layout("expel"))
+
+-- Center the focused column
+hl.bind("SUPER + SHIFT + C",     hl.dsp.layout("center"))
+```
+
+## Layout-Handled Fullscreen
+
+Scrolling has an optional custom fullscreen handler that lets you scroll away from a fullscreened window without un-fullscreening it. Use `layout_aware = true` in your fullscreen dispatch (or omit the `layout_aware` option entirely) while on a Scrolling workspace to activate this behavior.
+
+<Note>
+  When a fullscreen window has focus, `hl.dsp.focus({ direction })` defaults to looking for other monitors rather than changing windows on the current workspace. To restore window-seeking behavior, either set `binds.movefocus_cycles_fullscreen = true`, or use Scrolling's own `focus` layout message instead.
+</Note>
+
+Learn more about Fullscreen Handlers in the [Dispatchers documentation](/configuring/dispatchers).

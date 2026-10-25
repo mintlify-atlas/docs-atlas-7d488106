@@ -1,0 +1,186 @@
+---
+title: "Hyprland Permission System: Control Compositor Access"
+sidebarTitle: Permissions
+description: "Configure Hyprland's per-binary permission system to allow, deny, or prompt for screencopy, plugin loading, keyboard input, and cursor tracking."
+---
+
+Hyprland includes a fine-grained permission system that governs which applications can access sensitive compositor capabilities — screen capture, plugin loading, cursor position tracking, input capture, and keyboard connections. When an app attempts a protected action, Hyprland can silently allow it, silently deny it, or pop up a prompt so you can decide at the time of the request. The system works similarly to Android app permissions.
+
+<Note>
+  The permission system requires `hyprland-guiutils` to be installed for the interactive prompt UI. Enable it by setting `hl.config({ ecosystem = { enforce_permissions = true } })` — it is **disabled** by default.
+</Note>
+
+<Tip>
+  If you care about locking down compositor access, you likely also want to restrict access to Hyprland's IPC sockets. Hyprland itself cannot enforce socket-level access control; consult the documentation for your application sandbox (e.g., Flatpak, bubblewrap, Firejail).
+</Tip>
+
+---
+
+## Enabling Permissions
+
+Add the following to your Lua config to activate permission enforcement:
+
+```lua
+hl.config({
+  ecosystem = {
+    enforce_permissions = true
+  }
+})
+```
+
+<Warning>
+  Permission rules defined in the config are **not** reloaded on-the-fly. A Hyprland restart is required for new or changed rules to take effect. This is intentional for security reasons.
+</Warning>
+
+---
+
+## Defining Permission Rules
+
+Use `hl.permission({ binary, type, mode })` to declare a rule:
+
+```lua
+hl.permission({ binary = "/usr/bin/grim", type = "screencopy", mode = "allow" })
+```
+
+The `binary` field is a **regular expression** matched against the full path of the requesting application. This means you can use regex patterns to match entire families of binaries:
+
+```lua
+-- Allow any binary whose path starts with /usr/bin/appsuite-
+hl.permission({ binary = "/usr/bin/appsuite-.*", type = "screencopy", mode = "allow" })
+```
+
+Rules are evaluated in order. The first matching rule for a given `(binary, type)` pair wins.
+
+---
+
+## Permission Modes
+
+| Mode | Behaviour |
+|------|-----------|
+| `allow` | Silently grant access without prompting. |
+| `ask` | Show a prompt each time. The prompt offers **Deny**, **Allow until app exits**, and **Allow until Hyprland exits**. |
+| `deny` | Silently reject access without prompting. |
+
+---
+
+## Permission Types
+
+<Accordion title="screencopy — Default: ASK">
+  Governs access to your screen **without** going through `xdg-desktop-portal-hyprland`. Applications in this category include `grim`, `wl-screenrec`, and `wf-recorder`.
+
+  If denied, the application receives a black frame with a "permission denied" text overlay instead of actual screen content.
+
+  **Why deny?** Prevents scripts or background apps from silently capturing your screen via raw Wayland protocols.
+
+  ```lua
+  hl.permission({ binary = "/usr/bin/grim", type = "screencopy", mode = "allow" })
+  ```
+</Accordion>
+
+<Accordion title="plugin — Default: ASK">
+  Governs the ability to load a compositor plugin. The `binary` field can match the requesting app path **or** the plugin `.so` path.
+
+  **Why deny `hyprctl`?** An attacker with shell access could run `hyprctl plugin load /tmp/malicious.so`. Setting `deny` or `ask` for `hyprctl` prevents silent plugin injection.
+
+  ```lua
+  -- Allow hyprpm to load plugins without prompting
+  hl.permission({ binary = "/usr/bin/hyprpm", type = "plugin", mode = "allow" })
+
+  -- Always prompt when hyprctl tries to load a plugin
+  hl.permission({ binary = "/usr/bin/hyprctl", type = "plugin", mode = "ask" })
+  ```
+</Accordion>
+
+<Accordion title="keyboard — Default: ALLOW">
+  Governs connection of new keyboard devices. The `binary` field matches the device name regex.
+
+  To block all keyboards that don't match a specific pattern, add a `deny` rule for `.*` as the **last** keyboard permission rule:
+
+  ```lua
+  hl.permission({ binary = "my-trusted-keyboard.*", type = "keyboard", mode = "allow" })
+  hl.permission({ binary = ".*", type = "keyboard", mode = "deny" })
+  ```
+
+  **Why deny?** Blocks USB rubber duckies and malicious virtual keyboards from injecting keystrokes.
+</Accordion>
+
+<Accordion title="cursorpos — Default: ASK">
+  Governs access to cursor position and cursor image via Wayland protocols directly, outside of xdg-desktop-portal.
+
+  **Why deny?** Prevents apps from silently tracking where your cursor is on screen.
+</Accordion>
+
+<Accordion title="input-capture — Default: ASK">
+  Governs access to capture **all** input events from the compositor — keyboard, pointer, and touch.
+
+  **Why deny?** Prevents apps from maliciously intercepting all user input without consent.
+</Accordion>
+
+---
+
+## Practical Examples
+
+<Steps>
+  <Step title="Allow grim and xdg-desktop-portal-hyprland to capture the screen">
+    This is the most common setup. Allow your screenshot tool and the portal to capture without prompting, but require a prompt for everything else.
+
+    ```lua
+    hl.permission({ binary = "/usr/bin/grim", type = "screencopy", mode = "allow" })
+    hl.permission({
+      binary = "/usr/(lib|libexec|lib64)/xdg-desktop-portal-hyprland",
+      type = "screencopy",
+      mode = "allow"
+    })
+    ```
+  </Step>
+  <Step title="Allow hyprpm to load plugins">
+    Let the official plugin manager load plugins silently.
+
+    ```lua
+    hl.permission({ binary = "/usr/bin/hyprpm", type = "plugin", mode = "allow" })
+    ```
+  </Step>
+  <Step title="NixOS: use regex for Nix store paths">
+    On NixOS, binary paths include a hash component that changes on each rebuild. Use a regex to match the store path pattern.
+
+    ```lua
+    hl.permission({
+      binary = "/nix/store/[a-z0-9]{32}-grim-[0-9.]*/bin/grim",
+      type = "screencopy",
+      mode = "allow"
+    })
+    hl.permission({
+      binary = "/nix/store/[a-z0-9]{32}-xdg-desktop-portal-hyprland-[0-9.]*/libexec/.xdg-desktop-portal-hyprland-wrapped",
+      type = "screencopy",
+      mode = "allow"
+    })
+    ```
+
+    When generating the config with Nix itself, string interpolation can be used directly. Be aware that if the interpolated path contains regex special characters (e.g., `+`) they must be escaped:
+
+    ```lua
+    hl.permission({ binary = "${lib.getExe pkgs.grim}", type = "screencopy", mode = "allow" })
+    hl.permission({ binary = [[${lib.escapeRegex (lib.getExe config.programs.hyprlock.package)}]], type = "screencopy", mode = "allow" })
+    hl.permission({ binary = [[${pkgs.xdg-desktop-portal-hyprland}/libexec/\.xdg-desktop-portal-hyprland-wrapped]], type = "screencopy", mode = "allow" })
+    ```
+  </Step>
+</Steps>
+
+---
+
+## Platform Notes
+
+<CardGroup cols={2}>
+  <Card title="Portals (xdg-desktop-portal)" icon="door-open">
+    xdg-desktop-portal implementations — including `xdg-desktop-portal-hyprland` — are treated as ordinary applications and go through permission checks. If you restrict screencopy, add an explicit `allow` rule for the portal binary or users will receive a permission prompt every time an app requests screen access through the portal.
+  </Card>
+  <Card title="BSD Systems" icon="server">
+    On some BSD systems, binary paths may not resolve correctly. If permission rules cannot be matched, consider disabling enforcement:
+
+    ```lua
+    hl.config({ ecosystem = { enforce_permissions = false } })
+    ```
+
+    Interactive prompts will still appear, but path-based rules and the "remember" option in prompts will not be available.
+  </Card>
+</CardGroup>

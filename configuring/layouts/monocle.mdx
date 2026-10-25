@@ -1,0 +1,66 @@
+---
+title: "Monocle Layout: Fullscreen Window Stack in Hyprland"
+sidebarTitle: Monocle
+description: "Hyprland's Monocle layout keeps every tiled window maximized to the full workspace area, letting you cycle through a stacked deck of windows."
+---
+
+Monocle is a layout where every tiled window always occupies the entire unreserved area of the workspace. Rather than arranging windows side-by-side, Monocle stacks them on top of one another — only one window is visible at a time, and you navigate the stack by cycling forward and backward through it. This is ideal for focused single-tasking workflows or for monitors where splitting is impractical.
+
+## How It Works
+
+When a new window opens under the Monocle layout, it fills the full workspace area and immediately receives focus. All other windows remain in the stack behind it, invisible until you cycle to them. There are no split ratios, column widths, or orientation settings — every window is always full size.
+
+<Tip>
+  Monocle pairs well with workspace animations. Cycling through the stack feels natural with a slide or fade animation configured under `animations`.
+</Tip>
+
+## Quirks
+
+<Warning>
+  The standard `hl.dsp.window.cycle_next()` dispatcher does **not** work with Monocle because windows share the same geometry and the standard cycle logic skips over them. Use the layout-specific `hl.dsp.layout("cyclenext")` dispatcher instead, or pass `{ tiled = true }` to `hl.dsp.window.cycle_next()`.
+</Warning>
+
+To cycle Monocle windows correctly, use one of these two approaches:
+
+<Tabs>
+  <Tab title="Layout Dispatcher (recommended)">
+    ```lua
+    hl.bind("SUPER + Tab",       hl.dsp.layout("cyclenext"))
+    hl.bind("SUPER + SHIFT + Tab", hl.dsp.layout("cycleprev"))
+    ```
+  </Tab>
+  <Tab title="Window Dispatcher with tiled flag">
+    ```lua
+    hl.bind("SUPER + Tab",       hl.dsp.window.cycle_next({ tiled = true }))
+    hl.bind("SUPER + SHIFT + Tab", hl.dsp.window.cycle_next({ tiled = true, prev = true }))
+    ```
+  </Tab>
+</Tabs>
+
+## Activating Monocle
+
+Set `general.layout` to `"monocle"` in your configuration:
+
+```lua
+general {
+    layout = monocle
+}
+```
+
+Monocle has no category-specific config options of its own — it uses the global `general` settings such as gaps and borders.
+
+## Layout Messages
+
+Layout messages are sent via `hl.dsp.layout()`. Monocle supports two cycle commands:
+
+| Name | Description | Params |
+| --- | --- | --- |
+| `cyclenext` | Bring the next window in the stack to the foreground | none |
+| `cycleprev` | Bring the previous window in the stack to the foreground | none |
+
+### Example Key Bindings
+
+```lua
+hl.bind("SUPER + Tab",         hl.dsp.layout("cyclenext"))
+hl.bind("SUPER + SHIFT + Tab", hl.dsp.layout("cycleprev"))
+```

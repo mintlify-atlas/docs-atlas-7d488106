@@ -1,0 +1,201 @@
+---
+title: "Selectors and Identifiers Reference for Hyprland"
+sidebarTitle: "Selectors"
+description: "How to target windows, workspaces, and monitors in Hyprland: address, class, title, workspace filters, relative query offsets, and direction selectors."
+---
+
+Selectors are how Hyprland identifies windows, workspaces, and monitors across dispatchers, rules, and Lua API calls. Understanding selectors is essential before working with rules, binds, or any feature that needs to target a specific surface or workspace.
+
+Any numeric ID can also be selected by a relative offset using `+` or `-` prefixes.
+
+---
+
+## RegEx Selector
+
+Hyprland uses [Google's RE2](https://github.com/google/re2) for all regular expressions. This means operations requiring polynomial time (e.g. backtracking) are not supported. See the [RE2 wiki](https://github.com/google/re2/wiki/Syntax) for the supported syntax.
+
+### Negation
+
+Prefix a regex with `negative:` to match only when the regex **fails**:
+
+```lua
+-- Match any class that is NOT "kitty"
+match = { class = "negative:kitty" }
+```
+
+<Tip>
+Lua's literal-string `[[]]` syntax is very useful for regexes to avoid double-escaping backslashes. Write `[[\\bword\\b]]` instead of `"\\\\bword\\\\b"`.
+</Tip>
+
+---
+
+## Window Selector
+
+Windows can be targeted in dispatchers and rules by the following selectors:
+
+| Selector | Description |
+| --- | --- |
+| Window object | A Lua window object obtained from `hl.get_active_window()` etc. |
+| `pid:N` | Window belonging to process with PID N |
+| `stableid:N` | Window with stable ID N |
+| `address:0x...` | Window by exact memory address |
+| `class:...` | Window class matching a regex |
+| `initialclass:...` | Window initial class matching a regex |
+| `title:...` | Window title matching a regex |
+| `initialtitle:...` | Window initial title matching a regex |
+| `tag:...` | Window with a matching tag |
+| `activewindow` | The currently focused window |
+| `floating` | Any floating window |
+| `tiled` | Any tiled window |
+
+If no window selector is provided to a dispatcher that accepts one, it defaults to the active window.
+
+### Examples
+
+```lua
+-- Close Firefox by class
+hl.dispatch(hl.dsp.window.close({ window = "class:firefox" }))
+
+-- Focus a window by address
+hl.dispatch(hl.dsp.focus({ window = "address:0x55a0b1234ab0" }))
+
+-- Float all windows tagged "scratch"
+hl.dispatch(hl.dsp.window.float({ window = "tag:scratch", action = "set" }))
+```
+
+---
+
+## Workspace Selector
+
+Workspaces can be identified in several ways.
+
+### Named and Numbered
+
+```lua
+hl.dsp.focus({ workspace = 1 })             -- Workspace by number
+hl.dsp.focus({ workspace = "Web" })          -- Workspace by name
+hl.dsp.focus({ workspace = "Better anime" }) -- Names with spaces are fine
+```
+
+### Special Workspaces
+
+```lua
+hl.dsp.focus({ workspace = "special" })        -- Any special workspace
+hl.dsp.focus({ workspace = "special:magic" })  -- Named special workspace
+```
+
+<Note>
+In contexts where only special workspaces are accepted (e.g. `hl.dsp.workspace.toggle_special()`), **omit** the `special:` prefix — it is added automatically. Only include it when the context also accepts regular workspaces.
+</Note>
+
+### Previous Workspace
+
+```lua
+hl.dsp.focus({ workspace = "previous" })
+hl.dsp.focus({ workspace = "previous_per_monitor" })
+```
+
+### Workspace Filters
+
+Filters target workspaces that **already exist**. A filter is a sequence of expressions separated by spaces (no spaces inside an expression):
+
+| Filter | Description |
+| --- | --- |
+| `r[A-B]` | ID range from A to B inclusive |
+| `s[bool]` | Whether the workspace is special |
+| `n[bool]` | Whether the workspace has a name |
+| `n[s:string]` | Name starts with string |
+| `n[e:string]` | Name ends with string |
+| `m[monitor]` | On the given monitor |
+| `w[A-B]` / `w[X]` | Window count in range A–B or exactly X |
+| `w[(t)X]` | Tiled window count |
+| `w[(f)X]` | Floating window count |
+| `w[(g)X]` | Group count |
+| `w[(v)X]` | Visible window count |
+| `f[-1]` | No fullscreen window |
+| `f[0]` | Covering fullscreen window |
+| `f[1]` | Maximized window |
+| `f[2]` | Fullscreen without sending fullscreen state |
+
+Filter examples used in [workspace rules](/configuring/rules#workspace-rules):
+
+```lua
+-- Workspace with exactly 1 tiled window (smart gaps)
+hl.workspace_rule({ workspace = "w[tv1]", gaps_in = 0, gaps_out = 0 })
+
+-- Workspace with 1 fullscreen window
+hl.workspace_rule({ workspace = "f[1]", gaps_in = 0, gaps_out = 0 })
+
+-- Combine: 1 tiled, not special
+hl.workspace_rule({ workspace = "w[tv1]s[false]", gaps_in = 0, gaps_out = 0 })
+```
+
+### Workspace Query (Relative / Absolute)
+
+Workspace queries use a selector letter followed by a signed offset or an absolute index (with `~`):
+
+| Selector | Description |
+| --- | --- |
+| `e+N` / `e-N` | N workspaces ahead/behind across all monitors (wraps around) |
+| `m+N` / `m-N` | N workspaces ahead/behind on the current monitor (wraps) |
+| `r+N` / `r-N` | N workspaces ahead/behind including empty ones on the current monitor |
+| `empty` | First empty workspace |
+| `emptym` | First empty workspace on current monitor |
+| `emptyn` | Next available empty workspace |
+| `m~N` | Absolute Nth workspace on the current monitor (1-indexed) |
+
+```lua
+hl.bind("SUPER + mouse_down", hl.dsp.focus({ workspace = "e-1" }))
+hl.bind("SUPER + mouse_up",   hl.dsp.focus({ workspace = "e+1" }))
+hl.bind("SUPER + N",          hl.dsp.focus({ workspace = "empty" }))
+```
+
+<Warning>
+For query selectors that accept an ID, a sign or `~` is required. `m3` is interpreted as a workspace *name*, not a query — it will do nothing unless you have a workspace named "m3".
+</Warning>
+
+---
+
+## Monitor Selector
+
+Monitors can be targeted with:
+
+| Selector | Description |
+| --- | --- |
+| Monitor object | A Lua monitor object |
+| Monitor ID | Numeric ID from `hyprctl monitors` |
+| Port name | E.g. `"DP-1"`, `"eDP-1"` |
+| `desc:...` | Description prefix from `hyprctl monitors` |
+| Direction | `l`/`left`, `r`/`right`, `u`/`up`, `d`/`down` |
+| `current` | The currently focused monitor |
+
+```lua
+-- Move workspace to a monitor by name
+hl.dispatch(hl.dsp.workspace.move({ monitor = "DP-2" }))
+
+-- Focus the monitor to the right
+hl.dispatch(hl.dsp.focus({ monitor = "right" }))
+
+-- Move window to the monitor described by its EDID description
+hl.dispatch(hl.dsp.window.move({ monitor = "desc:Chimei Innolux Corporation 0x150C" }))
+```
+
+---
+
+## Direction
+
+A direction value is used by dispatchers such as `hl.dsp.focus({ direction })` and `hl.dsp.window.move({ direction })`.
+
+| Value | Direction |
+| --- | --- |
+| `l` or `left` | Left |
+| `r` or `right` | Right |
+| `u` or `up` | Up |
+| `d` or `down` | Down |
+
+```lua
+hl.bind("SUPER + h", hl.dsp.focus({ direction = "left" }))
+hl.bind("SUPER + l", hl.dsp.focus({ direction = "right" }))
+hl.bind("SUPER + k", hl.dsp.focus({ direction = "up" }))
+hl.bind("SUPER + j", hl.dsp.focus({ direction = "down" }))
+```

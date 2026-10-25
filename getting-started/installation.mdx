@@ -1,0 +1,448 @@
+---
+title: "Installing Hyprland on Your Linux Distribution of Choice"
+sidebarTitle: "Installation"
+description: "Step-by-step install instructions for Arch, NixOS, Fedora, Debian, Ubuntu, Alpine, Void, and more, plus manual build and CMake flag guidance."
+---
+
+Installing Hyprland is straightforward on most modern Linux distributions — in the majority of cases, a single package manager command is all you need. The project is officially developed and tested on **Arch Linux** and **NixOS**, so those two distributions will always have the most up-to-date and reliable packages. Rolling-release distros such as openSUSE Tumbleweed and Solus generally work well too. Point-release distros (Ubuntu LTS, older Fedora, Pop!\_OS) ship older dependency versions that may cause significant compatibility problems — proceed with extra care on those.
+
+<Warning>
+  Hyprland is not a full Desktop Environment. Apps, integrations, shells, and desktop services are **your** responsibility to pick, install, and configure. Read this wiki thoroughly before assuming something is not working.
+</Warning>
+
+<Note>
+  NVIDIA GPUs are often not usable out of the box. If you plan to use an NVIDIA card, follow the [NVIDIA page](/nvidia) **after** installing Hyprland.
+</Note>
+
+## Choosing How to Install
+
+It is **strongly** recommended to use whatever your distro packages for you — do not compile manually or reach for `-git` AUR packages unless you are an experienced user who wants to beta-test new features. Hyprland's ecosystem and dependencies are vast and tightly intertwined. Compiling manually or mixing package sources can expose you to mismatched `.so` files, ABI breaks, and hard-to-debug crashes.
+
+<Info>
+  [Nix](/nix/overview) solves the dependency mismatch problem for any distro that uses systemd. It does not replace your existing package manager and keeps all Hyprland packages in sync automatically.
+</Info>
+
+<Warning>
+  The Hypr\* team does not maintain any distro packages. If a package is broken, try building from source first before filing a bug report.
+</Warning>
+
+## Install by Distribution
+
+<Tabs>
+  <Tab title="Arch">
+    Install the latest tagged release directly from the official Arch repositories:
+
+    ```bash
+    sudo pacman -S hyprland
+    ```
+
+    ### Compile from Source (AUR)
+
+    <Warning>
+      Using `-git` packages or compiling from source means that every time a direct dependency like `hyprutils` has an ABI-breaking update, you must recompile Hyprland **and** all dependent tools, or you will get a `.so not found` error.
+    </Warning>
+
+    Install the latest source via the AUR:
+
+    ```bash
+    yay -S hyprland-git
+    ```
+
+    To automatically fetch and compile the latest git versions of the entire hypr\* ecosystem:
+
+    ```bash
+    yay -S hyprland-meta-git
+    ```
+
+    Pre-built binaries of the `-git` packages are also available through the [Chaotic AUR](https://aur.chaotic.cx/), though dependency rebuilds are not guaranteed to be automatic there.
+
+    <Note>
+      You can downgrade easily with [downgrade](https://github.com/archlinux-downgrade/downgrade) to roll back to a previous `-git` version.
+    </Note>
+  </Tab>
+
+  <Tab title="NixOS">
+    Enable Hyprland in your NixOS configuration:
+
+    ```nix
+    {
+      programs.hyprland.enable = true;
+    }
+    ```
+
+    For flake-based setups, module options, and Home Manager integration, see the dedicated [Nix page](/nix).
+  </Tab>
+
+  <Tab title="openSUSE*">
+    Hyprland is part of openSUSE Factory starting with snapshot `20230411`. Install it with zypper:
+
+    ```sh
+    sudo zypper in hyprland
+    ```
+
+    Alternatively, install the `hyprland` package via YaST2 Software.
+
+    For `hyprpm` to recognize its dependencies, also install the development package:
+
+    ```sh
+    sudo zypper in hyprland-devel
+    ```
+
+    <Note>
+      Hyprland is not available for openSUSE Leap — the compiler and most required libraries are too old on that release stream.
+    </Note>
+  </Tab>
+
+  <Tab title="Fedora*">
+    Use the [lionheartp/Hyprland](https://copr.fedorainfracloud.org/coprs/lionheartp/Hyprland) Copr repository.
+
+    You can also compile it yourself by following the community instructions in [this GitHub discussion](https://github.com/hyprwm/Hyprland/discussions/284).
+  </Tab>
+
+  <Tab title="Debian*">
+    `hyprland` is available as of Debian 14 (Forky) and in the Debian 13 (Trixie) backports:
+
+    ```bash
+    sudo apt install hyprland
+    ```
+
+    To install from Trixie backports specifically:
+
+    ```bash
+    sudo apt install -t trixie-backports hyprland
+    ```
+
+    <Note>
+      Hyprland is not available for Bookworm — its packages are too old to satisfy Hyprland's requirements.
+    </Note>
+  </Tab>
+
+  <Tab title="Gentoo*">
+    The hypr\* packages are available in the [hyproverlay](https://codeberg.org/hyproverlay/hyproverlay). Enable the overlay first:
+
+    ```sh
+    sudo eselect repository enable hyproverlay
+    sudo emaint sync -r hyproverlay
+    ```
+
+    Then install Hyprland:
+
+    ```sh
+    sudo emerge --ask gui-wm/hyprland
+    ```
+
+    Additional ecosystem packages are also available in the overlay:
+
+    ```sh
+    emerge --ask gui-apps/hyprlock
+    emerge --ask gui-apps/hypridle
+    emerge --ask gui-libs/xdg-desktop-portal-hyprland
+    emerge --ask gui-apps/hyprpaper
+    emerge --ask gui-apps/hyprpicker
+    ```
+
+    For USE flags and further details, see the [Gentoo wiki page for Hyprland](https://wiki.gentoo.org/wiki/Hyprland).
+  </Tab>
+
+  <Tab title="FreeBSD*">
+    Hyprland and related tools are all available in the default FreeBSD ports/packages repository:
+
+    - [hyprland](https://www.freshports.org/x11-wm/hyprland)
+    - [hyprpaper](https://www.freshports.org/x11/hyprpaper)
+    - [hyprpicker](https://www.freshports.org/x11/hyprpicker)
+    - [xdg-desktop-portal-hyprland](https://www.freshports.org/x11/xdg-desktop-portal-hyprland)
+    - [Other Wayland ports](https://www.freshports.org/wayland/)
+  </Tab>
+
+  <Tab title="Ubuntu*">
+    <Warning>
+      Ubuntu 26.04 and earlier include an **extremely** outdated `hyprland` package. It is not recommended to use the packaged versions on those releases — build the entire stack [manually](#manual-build) instead.
+    </Warning>
+
+    **Ubuntu 26.10 (Stonking Stingray)** includes `hyprland 0.56.2` in the universe repository. Installing from `apt` is recommended on this release:
+
+    ```bash
+    sudo add-apt-repository universe && sudo apt update && sudo apt install hyprland
+    ```
+
+    **Ubuntu 26.04 LTS (Resolute Raccoon)**:
+
+    ```bash
+    sudo add-apt-repository universe && sudo apt update && sudo apt install hyprland
+    ```
+
+    **Ubuntu 24.10 (Oracular Oriole)**:
+
+    ```bash
+    sudo add-apt-repository universe && sudo apt update && sudo apt install hyprland
+    ```
+  </Tab>
+
+  <Tab title="Alpine*">
+    Hyprland is available in Alpine's [community repository](https://wiki.alpinelinux.org/wiki/Repositories#Community) and is maintained by the community:
+
+    ```sh
+    apk add hyprland
+    ```
+  </Tab>
+
+  <Tab title="Void Linux*">
+    Hyprland is not in Void Linux's official repositories due to a [conflict of packaging philosophy](https://github.com/void-linux/void-packages/issues/37544). A community-maintained third-party repository with CI-built binaries is available at [Event-Horizon-VL/blackhole-vl](https://github.com/Event-Horizon-VL/blackhole-vl).
+
+    Add the repository:
+
+    ```sh
+    sudo cp /usr/share/xbps.d/00-repository-main.conf /etc/xbps.d/
+    sudo sed -i "1i repository=https://mirror.black-hole.dev/$(xbps-uhelper arch)" /etc/xbps.d/00-repository-main.conf
+    ```
+
+    Then install the packages:
+
+    ```sh
+    sudo xbps-install -S hyprland
+    sudo xbps-install -S hyprland-devel   # Required for plugins
+    sudo xbps-install -S xdg-desktop-portal-hyprland
+    ```
+
+    To list available hypr\* packages (after accepting the repository fingerprint):
+
+    ```sh
+    xbps-query -Rs hypr
+    ```
+
+    See the [blackhole-vl README](https://github.com/Event-Horizon-VL/blackhole-vl/blob/master/README.md) for full details including manual build templates.
+  </Tab>
+</Tabs>
+
+<Note>
+  Distributions marked with `*` are not officially supported. Instructions are community-driven and no guarantee is provided for their validity.
+</Note>
+
+<Note>
+  If you plan to use plugins, note that `hyprpm` may be packaged separately on some distributions.
+</Note>
+
+---
+
+## Manual Build
+
+Manual builds are intended for experienced users who want to track the latest git HEAD or contribute to development. If you just want Hyprland running, use the package manager instructions above.
+
+<Warning>
+  **Never** symbolically link different `.so` versions together. This causes memory bugs and crashes. Do not do this regardless of what you read elsewhere.
+</Warning>
+
+<Warning>
+  Hyprland uses the **C++26 standard**. Your compiler and C++ standard library must support it: `gcc >= 16` or `clang >= 19`.
+</Warning>
+
+### 1. Install Build Dependencies
+
+<Tabs>
+  <Tab title="Arch">
+    ```plain
+    yay -S ninja gcc cmake meson libxcb xcb-proto xcb-util xcb-util-keysyms libxfixes libx11 libxcomposite libxrender libxcursor pixman wayland-protocols cairo pango libxkbcommon xcb-util-wm xorg-xwayland libinput libliftoff libdisplay-info cpio tomlplusplus hyprlang-git hyprcursor-git hyprwayland-scanner-git hyprwire-git xcb-util-errors hyprutils-git glaze hyprgraphics-git aquamarine-git re2 hyprland-qtutils-git muparser
+    ```
+  </Tab>
+
+  <Tab title="openSUSE">
+    ```sh
+    zypper in gcc-c++ git meson cmake "pkgconfig(cairo)" "pkgconfig(egl)" "pkgconfig(gbm)" "pkgconfig(gl)" "pkgconfig(glesv2)" "pkgconfig(libdrm)" "pkgconfig(libinput)" "pkgconfig(libseat)" "pkgconfig(libudev)" "pkgconfig(pango)" "pkgconfig(pangocairo)" "pkgconfig(pixman-1)" "pkgconfig(vulkan)" "pkgconfig(wayland-client)" "pkgconfig(wayland-protocols)" "pkgconfig(wayland-scanner)" "pkgconfig(wayland-server)" "pkgconfig(xcb)" "pkgconfig(xcb-icccm)" "pkgconfig(xcb-renderutil)" "pkgconfig(xkbcommon)" "pkgconfig(xwayland)" "pkgconfig(xcb-errors)" glslang-devel Mesa-libGLESv3-devel tomlplusplus-devel
+    ```
+
+    This also works on RHEL/Fedora if you remove `Mesa-libGLESv3-devel` and `pkgconfig(xcb-errors)`.
+  </Tab>
+
+  <Tab title="FreeBSD">
+    ```sh
+    pkg install git pkgconf gmake gcc evdev-proto cmake wayland-protocols wayland libglvnd libxkbcommon libinput cairo pango pixman libxcb meson jq hwdata libdisplay-info libliftoff
+    export CC=gcc CXX=g++ LDFLAGS="-static-libstdc++ -static-libgcc"
+    ```
+  </Tab>
+
+  <Tab title="Ubuntu 24.10">
+    ```bash
+    sudo apt install -y meson wget build-essential ninja-build cmake-extras cmake gettext gettext-base fontconfig libfontconfig-dev libffi-dev libxml2-dev libdrm-dev libxkbcommon-x11-dev libxkbregistry-dev libxkbcommon-dev libpixman-1-dev libudev-dev libseat-dev seatd libxcb-dri3-dev libegl-dev libgles2 libegl1-mesa-dev glslang-tools libinput-bin libinput-dev libxcb-composite0-dev libavutil-dev libavcodec-dev libavformat-dev libxcb-ewmh2 libxcb-ewmh-dev libxcb-present-dev libxcb-icccm4-dev libxcb-render-util0-dev libxcb-res0-dev libxcb-xinput-dev libtomlplusplus3 libre2-dev
+    ```
+
+    You will also need to build the latest `wayland`, `wayland-protocols`, and `libdisplay-info` tagged releases from source.
+
+    For screen sharing, install `xdg-desktop-portal-wlr` or `xdg-desktop-portal-hyprland`:
+
+    ```bash
+    sudo apt install -y xdg-desktop-portal-wlr
+    ```
+
+    For Ubuntu 26.04 LTS, a build script is available at [gitlab.com/kralos/hyprbuntu](https://gitlab.com/kralos/hyprbuntu).
+
+    <Warning>
+      Ubuntu's dependencies are often behind. The build may not work at all, and is likely to break as Hyprland advances. Always use the latest Ubuntu version for the best chance of success.
+    </Warning>
+  </Tab>
+</Tabs>
+
+### 2. Build in the Correct Order
+
+Components must be built in the following sequence — build order matters because each step depends on the previous ones:
+
+```plain
+lua
+hyprland-protocols
+hyprwayland-scanner
+hyprutils
+hyprgraphics
+hyprlang
+hyprcursor
+aquamarine
+xdg-desktop-portal-hyprland
+hyprwire
+hyprtoolkit
+hyprland
+```
+
+Other hypr\* stack packages (e.g., `hyprlock`, `hyprsunset`) can be built in any order **after** Hyprland itself.
+
+### 3. Clone and Build Hyprland
+
+```sh
+git clone --recursive https://github.com/hyprwm/Hyprland
+cd Hyprland
+make all && sudo make install
+```
+
+---
+
+## Custom Installation (Debug Builds)
+
+<Steps>
+  <Step title="Enter the Hyprland repository">
+    ```bash
+    cd Hyprland
+    ```
+  </Step>
+
+  <Step title="Build in your desired mode">
+    For a debug build:
+
+    ```bash
+    make debug
+    sudo make install
+    ```
+
+    For any other preset (replace `<PRESET>` with `release` or `debug`):
+
+    ```bash
+    make <PRESET> && sudo cp ./build/Hyprland /usr/bin && sudo cp ./example/hyprland.desktop /usr/share/wayland-sessions
+    ```
+  </Step>
+</Steps>
+
+---
+
+## Custom CMake Build Flags
+
+To apply custom build flags you must invoke CMake directly instead of using `make`. The following flags are supported:
+
+| Flag | Effect |
+|---|---|
+| `NO_XWAYLAND` | Removes XWayland support |
+| `NO_SYSTEMD` | Removes systemd dependencies |
+| `NO_UWSM` | Does not install the `hyprland-uwsm.desktop` file |
+| `NO_HYPRPM` | Does not build or install `hyprpm` |
+
+<Steps>
+  <Step title="Configure with CMake">
+    Pass one or more flags using `-D<FLAG>:STRING=true`:
+
+    ```bash
+    cmake --no-warn-unused-cli -DCMAKE_BUILD_TYPE:STRING=Release -DNO_XWAYLAND:STRING=true -B build
+    ```
+
+    Multiple flags can be combined:
+
+    ```bash
+    cmake --no-warn-unused-cli -DCMAKE_BUILD_TYPE:STRING=Release -DNO_XWAYLAND:STRING=true -DNO_SYSTEMD:STRING=true -B build
+    ```
+  </Step>
+
+  <Step title="Build">
+    ```bash
+    cmake --build ./build --config Release --target all -j`nproc 2>/dev/null || getconf NPROCESSORS_CONF`
+    ```
+
+    If you configured a `Debug` build, change `--config Release` to `--config Debug`.
+  </Step>
+
+  <Step title="Install">
+    ```bash
+    sudo cmake --install ./build
+    ```
+  </Step>
+</Steps>
+
+---
+
+## Running in a VM
+
+<Warning>
+  Running Hyprland in a VM is not officially supported. Your mileage may vary.
+</Warning>
+
+Hyprland can run inside a QEMU/KVM virtual machine with hardware-accelerated 3D via virgl. Follow the steps below to set this up on an Arch host:
+
+<Steps>
+  <Step title="Install libvirt, QEMU, and virt-viewer">
+    ```bash
+    sudo pacman -S libvirt virt-viewer qemu-common
+    sudo usermod -a -G libvirt USER   # Replace USER with your username
+    systemctl enable --now libvirtd
+    ```
+
+    Read through the [libvirt Arch wiki page](https://wiki.archlinux.org/title/Libvirt) for full setup details.
+  </Step>
+
+  <Step title="Download an Arch QEMU image">
+    Grab the latest image from the [arch-boxes GitLab](https://gitlab.archlinux.org/archlinux/arch-boxes/-/packages):
+
+    ```bash
+    curl https://geo.mirror.pkgbuild.com/images/latest/Arch-Linux-x86_64-basic.qcow2 \
+      -o ~/Downloads/arch-qemu.qcow2
+    ```
+  </Step>
+
+  <Step title="Create the VM with virgl enabled">
+    ```bash
+    virt-install \
+      --graphics spice,listen=none,gl.enable=yes,rendernode=/dev/dri/renderD128 \
+      --name hypr-vm \
+      --os-variant archlinux \
+      --memory 2048 \
+      --disk ~/Downloads/arch-qemu.qcow2 \
+      --import
+    ```
+  </Step>
+
+  <Step title="Connect with virt-viewer">
+    <Warning>
+      Use the `--attach` flag. Because virgl requires disabling `listen`, a direct TCP/UNIX socket connection to the remote display is not possible — `--attach` asks libvirt for a pre-connected socket instead.
+    </Warning>
+
+    ```sh
+    virt-viewer --attach hypr-vm
+    ```
+
+    The default login is `arch` for both the username and password.
+  </Step>
+
+  <Step title="Install Hyprland inside the VM">
+    Inside the guest, follow either the [AUR instructions](#install-by-distribution) for `hyprland-git` or the [manual build instructions](#manual-build).
+
+    <Note>
+      Make sure you install `mesa` as the OpenGL driver inside the VM. The virgl drivers are included in `mesa`.
+    </Note>
+  </Step>
+</Steps>
+
+## Crash on Launch
+
+If Hyprland crashes immediately after launching, see the [Crashes and Bugs](/crashes-and-bugs) page.

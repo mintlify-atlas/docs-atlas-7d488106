@@ -1,0 +1,151 @@
+---
+title: "Custom Layouts: Writing Your Own Tiling Algorithm in Lua"
+sidebarTitle: Custom Layouts
+description: "Define fully custom Hyprland layout algorithms directly in your Lua config using hl.layout.register, with built-in helpers for columns, grids, and splits."
+---
+
+Hyprland allows you to define your own window layout algorithms entirely within your Lua configuration — no C++ compilation, no plugin boilerplate. A custom layout is registered with `hl.layout.register` and can then be selected like any built-in layout using the `lua:` prefix.
+
+## Registration
+
+Custom layouts are registered with the following call:
+
+```lua
+hl.layout.register(name, { recalculate, layout_msg? })
+```
+
+- **`name`** — A unique string identifier for your layout. Select it with `general.layout = "lua:name"`.
+- **`recalculate`** — A required function called by Hyprland whenever the workspace needs to be re-tiled (window opened, closed, resized, etc.).
+- **`layout_msg`** — An optional function that handles custom layout messages sent via `hl.dsp.layout()`.
+
+Once registered, activate it in your config:
+
+```lua
+general {
+    layout = lua:columns
+}
+```
+
+## The `recalculate` Function
+
+The `recalculate` function receives a single `ctx` (context) object. It is responsible for placing every window in `ctx.targets` by calling either `target:place()` or `target:set_box()` on each one.
+
+<Note>
+  Always prefer `target:place()` over `target:set_box()` unless you need full manual control. `:place()` automatically handles gaps, pseudotiling, reserved screen space, and other layout-aware adjustments. `:set_box()` bypasses all of that and should only be used when absolutely necessary.
+</Note>
+
+### `ctx` Properties and Methods
+
+| Property / Method | Description |
+| --- | --- |
+| `ctx.targets` | Array of layout target objects to be placed this cycle |
+| `ctx.area` | The usable work area rectangle for the workspace |
+| `ctx:column(i, n)` | Returns a box for the `i`-th column out of `n` equal columns |
+| `ctx:row(i, n)` | Returns a box for the `i`-th row out of `n` equal rows |
+| `ctx:grid_cell(i, n)` | Returns a box for the `i`-th cell in an `n`-cell grid |
+| `ctx:split(box, direction, ratio?)` | Splits a box in the given direction at an optional ratio (default 0.5), returning two boxes |
+
+### Target Properties
+
+| Property | Description |
+| --- | --- |
+| `target.window` | The window associated with this target. May not always be present; some targets (such as groups) expose only the primary window |
+
+## A Simple Example: Columns Layout
+
+The following layout divides the workspace into `n` equal columns — one per window:
+
+```lua
+hl.layout.register("columns", {
+    recalculate = function(ctx)
+        local n = #ctx.targets
+        if n == 0 then
+            return
+        end
+
+        for i, target in ipairs(ctx.targets) do
+            target:place(ctx:column(i, n))
+        end
+    end,
+})
+```
+
+Activate it with:
+
+```lua
+general {
+    layout = lua:columns
+}
+```
+
+## A Grid Example
+
+You can combine `ctx:grid_cell` to tile windows in a grid:
+
+```lua
+hl.layout.register("grid", {
+    recalculate = function(ctx)
+        local n = #ctx.targets
+        if n == 0 then
+            return
+        end
+
+        for i, target in ipairs(ctx.targets) do
+            target:place(ctx:grid_cell(i, n))
+        end
+    end,
+})
+```
+
+## Adding a Layout Message Handler
+
+The optional `layout_msg` function receives the message string sent via `hl.dsp.layout()` and can implement custom dispatchers:
+
+```lua
+hl.layout.register("columns", {
+    recalculate = function(ctx)
+        local n = #ctx.targets
+        if n == 0 then return end
+        for i, target in ipairs(ctx.targets) do
+            target:place(ctx:column(i, n))
+        end
+    end,
+
+    layout_msg = function(msg)
+        if msg == "swap" then
+            -- custom swap logic here
+        end
+    end,
+})
+```
+
+Then dispatch it from a keybind:
+
+```lua
+hl.bind("SUPER + S", hl.dsp.layout("swap"))
+```
+
+## Example Layouts in the Hyprland Repository
+
+The Hyprland repository includes several ready-to-use example layouts that demonstrate common patterns:
+
+<Card title="Example Layouts on GitHub" icon="github" href="https://github.com/hyprwm/Hyprland/tree/main/example/layouts">
+  Browse the official example Lua layouts for patterns you can adapt or use directly in your own configuration.
+</Card>
+
+<Accordion title="Key API Summary">
+
+| API | Purpose |
+| --- | --- |
+| `hl.layout.register(name, def)` | Register a custom layout under the given name |
+| `ctx.targets` | List of windows to place in the current recalculate cycle |
+| `ctx.area` | Usable rectangle for the workspace |
+| `ctx:column(i, n)` | Box for the `i`-th of `n` equal vertical columns |
+| `ctx:row(i, n)` | Box for the `i`-th of `n` equal horizontal rows |
+| `ctx:grid_cell(i, n)` | Box for the `i`-th cell in an `n`-cell grid |
+| `ctx:split(box, dir, ratio?)` | Split a box into two halves |
+| `target:place(box)` | Place a window with full layout-aware adjustments (recommended) |
+| `target:set_box(box)` | Place a window with raw coordinates (advanced use only) |
+| `target.window` | The window for a given target (may be `nil` for group targets) |
+
+</Accordion>

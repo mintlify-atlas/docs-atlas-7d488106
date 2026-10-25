@@ -1,0 +1,466 @@
+---
+title: "Configuring Keybinds and Bindings in Hyprland"
+sidebarTitle: "Binds"
+description: "Complete guide to Hyprland keybinds: syntax, flags, submaps, mouse binds, per-device binds, gestures, global hotkeys, switches, and keyboard layouts."
+---
+
+Hyprland keybinds are declared in Lua using `hl.bind()`. They connect a key combination to a dispatcher or a Lua function, and optionally accept a table of flags to modify their behaviour. This page covers everything from basic syntax to advanced patterns like submaps, per-device binds, and global hotkeys.
+
+<Warning>
+**Keybind handlers must not block.** Lua callbacks run on the compositor event loop. Avoid `io.popen`, network I/O, clipboard tools (`wl-paste`, `xclip`), sleeps, and other long-running work inside bind functions. Use `hl.dsp.exec_cmd(...)` for external commands so they run outside the callback. A hung or slow call freezes input and the entire desktop until it returns.
+</Warning>
+
+## Basic Syntax
+
+```lua
+hl.bind("keys", dispatcher_or_function, { bind_flags })
+```
+
+The dispatcher list is documented on the [Dispatchers page](/configuring/dispatchers). You can also supply a plain Lua function as the second argument.
+
+```lua
+-- Bind SUPER + SHIFT + Q to open Firefox
+hl.bind("SUPER + SHIFT + Q", hl.dsp.exec_cmd("firefox"))
+
+-- Bind to an anonymous function with logic inside
+hl.bind("SUPER + SHIFT + X", function()
+    hl.dispatch(hl.dsp.window.float())
+end)
+```
+
+<Tip>
+If you are unsure what your key's name or keycode is, use [`wev`](https://github.com/jwrdegoede/wev) to find out.
+</Tip>
+
+## Uncommon Keysyms and Keycodes
+
+Find all keysyms in the [xkbcommon-keysyms.h header](https://github.com/xkbcommon/libxkbcommon/blob/master/include/xkbcommon/xkbcommon-keysyms.h). Use the name after `XKB_KEY_`.
+
+To bind by keycode rather than keysym, prefix it with `code:`:
+
+```lua
+-- Bind SUPER + T (keycode 28)
+hl.bind("SUPER + code:28", hl.dsp.exec_cmd("amongus"))
+```
+
+## Binding Modifier Keys Only
+
+To bind only a modifier key, use its keysym name such as `Super_L`, `Alt_L`, `Ctrl_R`:
+
+```lua
+-- Left Alt alone
+hl.bind("Alt_L", hl.dsp.exec_cmd("wofi"))
+
+-- Left Super + Left Alt
+hl.bind("Super_L + Alt_L", hl.dsp.exec_cmd("kitty"))
+```
+
+When a keysym is used, key press order matters because keys are no longer treated as modifiers.
+
+## Multiple Actions on One Key
+
+Wrap multiple dispatchers in a Lua function:
+
+```lua
+hl.bind("SUPER + Tab", function()
+    hl.dispatch(hl.dsp.window.cycle_next())
+    hl.dispatch(hl.dsp.window.alter_zorder({ mode = "top" }))
+end)
+```
+
+<Warning>
+Keybinds with the same key are executed top-to-bottom in the order they were declared.
+</Warning>
+
+## Unbinding Keys
+
+Use `hl.unbind()` or the methods on the bind handle returned by `hl.bind()`. The key string is case-sensitive and must exactly match the original bind.
+
+```lua
+hl.bind("SUPER + TAB", hl.dsp.focus({ workspace = "e+1" }))
+hl.unbind("SUPER + TAB")  -- removes the bind above
+
+local moveLeft = hl.bind("SUPER + L", hl.dsp.window.move({ direction = "left" }))
+moveLeft:unbind()  -- or moveLeft:remove()
+```
+
+## XKB Options
+
+Change key behaviour with `kb_options`:
+
+```lua
+-- Remap Caps Lock to Ctrl
+hl.config({ input = { kb_options = "ctrl:nocaps" } })
+
+-- Swap Caps Lock and Escape
+hl.config({ input = { kb_options = "caps:swapescape" } })
+```
+
+View all available options:
+
+```bash
+cat /usr/share/X11/xkb/rules/base.lst
+```
+
+---
+
+## Bind Flags
+
+Pass flags as the third argument to `hl.bind()`:
+
+```lua
+hl.bind(keys, hl.dsp.exec_cmd("someapp"), { release = true, locked = true })
+```
+
+| Flag | Description |
+| --- | --- |
+| `locked` | Triggers even when an input inhibitor (e.g. lock screen) is active |
+| `release` | Triggers on key release |
+| `click` | Triggers on release if cursor stays within `binds:drag_threshold` |
+| `drag` | Triggers on release if cursor moves outside `binds:drag_threshold` |
+| `long_press` | Triggers on long press |
+| `repeating` | Repeats while held |
+| `non_consuming` | Key events are also passed to the active window |
+| `auto_consuming` | Key events are passed to the active window if the dispatcher doesn't succeed |
+| `mouse` | Enables mouse-movement-dependent dispatchers. See [Mouse Binds](#mouse-binds) |
+| `transparent` | Cannot be shadowed by other binds |
+| `ignore_mods` | Ignores modifiers |
+| `description` | Adds a description string to the bind |
+| `dont_inhibit` | Bypasses the app's request to inhibit keybinds |
+| `submap_universal` | Active regardless of the current submap |
+| `device` | Restricts the bind to specific devices. See [Per-Device Binds](#per-device-binds) |
+| `allow_input_capture` | Bind is processed even when input is captured by a client |
+
+### Description Flag
+
+```lua
+hl.bind("SUPER + Q", hl.dsp.exec_cmd("kitty"), { description = "Open my favourite terminal" })
+```
+
+Access descriptions via `hyprctl binds` or the bind object's `description` field.
+
+### Media Key Examples
+
+```lua
+hl.bind("XF86AudioRaiseVolume", hl.dsp.exec_cmd("wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%+"), { repeating = true })
+hl.bind("XF86AudioLowerVolume", hl.dsp.exec_cmd("wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-"), { repeating = true, locked = true })
+hl.bind("XF86AudioMute",        hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"), { locked = true })
+hl.bind("XF86AudioPlay", hl.dsp.exec_cmd("playerctl play-pause"), { locked = true })
+hl.bind("XF86AudioPrev", hl.dsp.exec_cmd("playerctl previous"),   { locked = true })
+hl.bind("XF86AudioNext", hl.dsp.exec_cmd("playerctl next"),       { locked = true })
+```
+
+---
+
+## Submaps
+
+Submaps let you activate a separate set of keybinds — ideal for resize modes, group management, and vim-like workflows.
+
+```lua
+-- Enter the "resize" submap
+hl.bind("ALT + R", hl.dsp.submap("resize"))
+
+-- Define the submap
+hl.define_submap("resize", function()
+    hl.bind("right", hl.dsp.window.resize({ x = 10, y = 0, relative = true }), { repeating = true })
+    hl.bind("left",  hl.dsp.window.resize({ x = -10, y = 0, relative = true }), { repeating = true })
+    hl.bind("up",    hl.dsp.window.resize({ x = 0, y = 10, relative = true }), { repeating = true })
+    hl.bind("down",  hl.dsp.window.resize({ x = 0, y = -10, relative = true }), { repeating = true })
+    hl.bind("escape", hl.dsp.submap("reset"))
+end)
+```
+
+<Warning>
+Always include an escape bind inside every submap. If you get stuck, run `hyprctl dispatch 'hl.dsp.submap("reset")'` from a terminal or a different TTY with `--instance 0`.
+</Warning>
+
+### Submap Universal Bind
+
+A bind that stays active no matter the current submap:
+
+```lua
+hl.bind("SUPER + K", hl.dsp.exec_cmd("kitty"), { submap_universal = true })
+```
+
+### Auto-Close a Submap
+
+Provide a second argument to `hl.define_submap()` to automatically exit after any dispatch:
+
+```lua
+hl.bind("SUPER + a", hl.dsp.submap("submapA"))
+
+-- Each bind in submapA automatically transitions to submapB
+hl.define_submap("submapA", "submapB", function()
+    hl.bind("a", hl.dsp.exec_cmd("someCoolThing.sh"))
+end)
+
+-- Each bind in submapB automatically resets to default
+hl.define_submap("submapB", "reset", function()
+    hl.bind("a", hl.dsp.exec_cmd("someOtherCoolThing.sh"))
+end)
+```
+
+### Catch-All Bind
+
+Exit a submap when any unbound key is pressed:
+
+```lua
+hl.bind("catchall", hl.dsp.submap("reset"))
+```
+
+### Nesting Submaps
+
+Submaps can nest to arbitrary depth:
+
+```lua
+hl.bind("SUPER + M", hl.dsp.submap("main_submap"))
+
+hl.define_submap("main_submap", function()
+    hl.bind("1", hl.dsp.submap("nested_one"))
+    hl.define_submap("nested_one", function()
+        hl.bind("SHIFT + escape", hl.dsp.submap("reset"))
+        hl.bind("escape", hl.dsp.submap("main_submap"))
+    end)
+    hl.bind("escape", hl.dsp.submap("reset"))
+end)
+```
+
+### Disabling All Keybinds
+
+Use a submap with only a single exit bind to temporarily disable all other binds:
+
+```lua
+hl.bind("SUPER + F12", hl.dsp.submap("clean"))
+hl.define_submap("clean", function()
+    hl.bind("SUPER + F12", hl.dsp.submap("reset"))
+end)
+```
+
+---
+
+## Mouse Binds
+
+Mouse button binds use the `mouse:` prefix before the keycode. Common codes:
+
+- `mouse:272` — Left Mouse Button
+- `mouse:273` — Right Mouse Button
+- `mouse:274` — Middle Mouse Button
+
+```lua
+hl.bind("SUPER + mouse:272", hl.dsp.exec_cmd("kitty"))
+```
+
+### Drag and Resize
+
+Movement-dependent dispatchers require the `mouse` flag:
+
+```lua
+hl.config({ binds = { drag_threshold = 10 } })
+
+-- Drag window by holding ALT + LMB and moving >10px
+hl.bind("ALT + mouse:272", hl.dsp.window.drag(), { mouse = true })
+-- Click (stay within threshold) to float the window
+hl.bind("ALT + mouse:272", hl.dsp.window.float(), { mouse = true, click = true })
+-- Resize with RMB
+hl.bind("ALT + mouse:273", hl.dsp.window.resize(), { mouse = true })
+```
+
+### Scroll Wheel Binds
+
+```lua
+hl.bind("SUPER + mouse_down", hl.dsp.focus({ workspace = "e-1" }))
+hl.bind("SUPER + mouse_up",   hl.dsp.focus({ workspace = "e+1" }))
+```
+
+<Note>
+There is a cooldown between consecutive scroll events, controlled by `binds.scroll_event_delay`.
+</Note>
+
+### Touchpad Mouse Alternatives
+
+Since clicking and moving on a touchpad is awkward, keyboard keys can substitute for mouse buttons:
+
+```lua
+hl.bind("SUPER + mouse:272", hl.dsp.window.drag(), { mouse = true })
+hl.bind("SUPER + CTRL_L",    hl.dsp.window.drag(), { mouse = true })
+
+hl.bind("SUPER + mouse:273", hl.dsp.window.resize(), { mouse = true })
+hl.bind("SUPER + ALT_L",     hl.dsp.window.resize(), { mouse = true })
+```
+
+---
+
+## Per-Device Binds
+
+Restrict a bind to specific input devices using the `device` flag:
+
+```lua
+-- Only example-keyboard-1 can trigger this bind
+hl.bind("SUPER + Q", hl.dsp.exec_cmd("kitty"), {
+    device = { inclusive = true, list = { "example-keyboard-1" } }
+})
+
+-- All keyboards except razer-keyboard and asus-keyboard
+hl.bind("SUPER + Q", hl.dsp.exec_cmd("kitty"), {
+    device = { inclusive = false, list = { "razer-keyboard", "asus-keyboard" } }
+})
+```
+
+- `inclusive = true` — only listed devices can trigger the bind.
+- `inclusive = false` — all devices except listed ones can trigger the bind.
+- If `inclusive` is omitted it defaults to `true`.
+
+Device names and tags can be checked with `hyprctl devices`.
+
+---
+
+## Switches
+
+Switches are useful for laptop lid events and similar hardware toggles. View available switches with `hyprctl devices`.
+
+```lua
+-- Trigger on any toggle
+hl.bind("switch:[switch name]", hl.dsp.exec_cmd("swaylock"), { locked = true })
+-- Trigger only when turning on
+hl.bind("switch:on:[switch name]", hl.dsp.exec_cmd("notify-send 'lid opened'"), { locked = true })
+-- Trigger only when turning off
+hl.bind("switch:off:[switch name]", hl.dsp.exec_cmd("notify-send 'lid closed'"), { locked = true })
+```
+
+<Warning>
+`systemd-logind`'s `HandleLidSwitch` settings in `logind.conf` may conflict with Hyprland's lid switch binds. Launch Hyprland via `systemd-inhibit --what=handle-lid-switch Hyprland` to have logind ignore the switch while Hyprland runs.
+</Warning>
+
+---
+
+## Global Hotkeys
+
+### Passing Keys to Other Windows
+
+Use the `pass` dispatcher to send keys to a specific window globally, including from other Wayland apps:
+
+```lua
+-- Global OBS start/stop recording shortcut
+hl.bind("SUPER + F10", hl.dsp.pass({ window = [[class:com\.obsproject\.Studio]] }))
+
+-- Push-to-talk for TeamSpeak 3 via mouse button 5
+hl.bind("mouse:276", hl.dsp.pass({ window = "class:TeamSpeak 3" }))
+```
+
+You can also send a different shortcut to the target window:
+
+```lua
+hl.bind("SUPER + F10", hl.dsp.send_shortcut({ mods = "SUPER", key = "F4", window = "class:(TeamSpeak 3)" }))
+```
+
+<Warning>
+This works flawlessly with all native Wayland applications. Xwayland behaviour is less reliable — make sure you are passing a "global Xorg keybind" when dealing with X11 apps.
+</Warning>
+
+### D-Bus Global Shortcuts
+
+Some apps register global shortcuts via the XDG GlobalShortcuts portal (requires [xdg-desktop-portal-hyprland](https://wiki.hyprland.org/hypr-ecosystem/user/xdg-desktop-portal-hyprland)):
+
+```bash
+hyprctl globalshortcuts
+```
+
+Then bind the shortcut with the `global` dispatcher:
+
+```lua
+hl.bind("SUPER + SHIFT + A", hl.dsp.global("coolApp:myToggle"))
+```
+
+---
+
+## Keyboard Layouts
+
+### Switchable Layouts with XKB
+
+Define multiple layouts with `kb_layout`; a toggle option activates them:
+
+```lua
+hl.config({
+    input = {
+        kb_layout  = "us,cz",
+        kb_variant = ",qwerty",
+        kb_options = "grp:alt_shift_toggle",
+    }
+})
+```
+
+Variants are per-layout — the number and order must match the layouts.
+
+<Warning>
+The **first** layout in `kb_layout` is used for binds by default. With `us,ua`, a bind would be `"SUPER + A"`; with `ua,us` it would be `"SUPER + Cyrillic_ef"`. Set `resolve_binds_by_sym = true` to instead activate binds by the symbol they produce in the current layout.
+</Warning>
+
+### Switching via hyprctl
+
+```bash
+hyprctl switchxkblayout
+```
+
+Find layout names:
+
+```bash
+grep -i 'persian' /usr/share/X11/xkb/rules/base.lst
+grep 'grp:.*toggle' /usr/share/X11/xkb/rules/base.lst
+```
+
+### Non-QWERTY Layout Workspace Binds
+
+On a French AZERTY layout, `0-9` require SHIFT, so workspace binds must use the unmodified key names:
+
+```lua
+-- French AZERTY: workspace 1 is bound to `&` not `1`
+hl.bind("SUPER + ampersand", hl.dsp.focus({ workspace = 1 }))
+```
+
+---
+
+## Binding Quirks
+
+### Conditional Bind Resolution
+
+Conditions inside a bind are evaluated **at config load time**, not at call time. Wrap them in a function to evaluate them on each press:
+
+```lua
+-- WRONG: condition is frozen at load time
+hl.bind("SUPER + L", hl.dsp.exec_cmd("foot", { float = not (hl.get_active_window().title == "foot") }))
+
+-- CORRECT: evaluated on each keypress
+hl.bind("SUPER + L", function()
+    local is_foot = hl.get_active_window().title == "foot"
+    hl.dispatch(hl.dsp.exec_cmd("foot", { float = not is_foot }))
+end)
+```
+
+### Auto-Consuming and `return { ok = false }`
+
+When the `auto_consuming` flag is set, the keypress is passed to the active window if the dispatcher returns `{ ok = false }`:
+
+```lua
+hl.bind("p", function()
+    local window = hl.get_active_window()
+    if window and window.title == "some cool app" then
+        hl.dispatch(hl.dsp.exec_cmd("another_cool_app"))
+    else
+        return { ok = false }  -- pass 'p' to the active window
+    end
+end, { auto_consuming = true })
+```
+
+### Keys Handled by systemd-logind
+
+To intercept hardware events like the power button that logind normally handles, launch Hyprland via `systemd-inhibit`:
+
+```bash
+systemd-inhibit --what=handle-power-key Hyprland
+```
+
+Then bind the relevant keysym:
+
+```lua
+hl.bind("XF86PowerOff", hl.dsp.exec_cmd("wlogout"))
+```

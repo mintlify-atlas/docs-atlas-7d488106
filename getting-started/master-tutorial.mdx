@@ -1,0 +1,210 @@
+---
+title: "Hyprland Master Tutorial: Complete First-Time Setup Guide"
+sidebarTitle: "Master Tutorial"
+description: "Walk through launching Hyprland for the first time — default config, keybinds, terminal setup, Wayland app compatibility, themes, and cursors."
+---
+
+This is the definitive first-run guide for Hyprland. It covers every step you need to go from a bare installation to a functional, comfortable desktop: launching the compositor, editing the Lua configuration, picking essential software, forcing apps to use Wayland natively, and fine-tuning themes and cursors. Work through the steps in order — each one builds on the last.
+
+<Note>
+  Before starting, make sure you have already installed Hyprland. If you haven't, go to the [Installation](/getting-started/installation) page first and come back here once Hyprland is on your system.
+</Note>
+
+<Steps>
+
+  <Step title="Install a Terminal Emulator">
+    The default Hyprland configuration binds `SUPER + Q` to launch **kitty**. Install it before your first launch so you have a terminal available from the moment Hyprland starts:
+
+    ```bash
+    # Arch
+    sudo pacman -S kitty
+
+    # Debian / Ubuntu
+    sudo apt install kitty
+
+    # Alpine
+    apk add kitty
+    ```
+
+    Kitty is available in most distribution repositories. Once Hyprland is running you can change the default terminal to anything you prefer.
+  </Step>
+
+  <Step title="Check NVIDIA and VM Prerequisites">
+    <Tabs>
+      <Tab title="NVIDIA GPU">
+        If you are using an NVIDIA graphics card, **do not skip this step.** NVIDIA GPUs require additional environment variables and driver configuration that must be in place before you launch Hyprland for the first time.
+
+        Read the [NVIDIA page](/nvidia) in full before continuing.
+      </Tab>
+      <Tab title="Virtual Machine">
+        If you are running Hyprland inside a virtual machine, make sure **3D acceleration is enabled** in your `virtio` configuration or `virt-manager` settings. Without it, Hyprland will not start at all.
+
+        Passing through a real GPU is also a valid option. Be aware that software 3D acceleration in VMs can be noticeably slow.
+      </Tab>
+      <Tab title="Physical Hardware (no NVIDIA)">
+        No extra steps needed — continue to the next step.
+      </Tab>
+    </Tabs>
+  </Step>
+
+  <Step title="Launch Hyprland">
+    From a TTY (not inside another graphical session), start Hyprland with:
+
+    ```bash
+    start-hyprland
+    ```
+
+    <Warning>
+      Do **not** launch Hyprland with root permissions. Do not prefix this command with `sudo`.
+    </Warning>
+
+    To see all available launch flags (including setting a custom config path):
+
+    ```bash
+    start-hyprland -- -h
+    ```
+
+    ### Login Manager Compatibility
+
+    Login managers are not officially supported, but the following are known to work:
+
+    | Login Manager | Status |
+    |---|---|
+    | SDDM ≥ 0.20.0 | Works flawlessly. Older versions have a 90-second shutdown bug. |
+    | plasma-login-manager | Works flawlessly, but requires systemd. |
+    | GDM | Works, but Hyprland crashes on the first launch attempt. |
+    | greetd (with ReGreet) | Works flawlessly. |
+    | ly | Works flawlessly. |
+  </Step>
+
+  <Step title="Consider a Preconfigured Setup">
+    If you would rather start from a fully-featured, DE-like configuration instead of building your own from scratch, visit the [Preconfigured Setups](/getting-started/preconfigured-setups) page. Those dotfiles handle nearly everything for you and include their own tutorials.
+
+    If you choose a preconfigured setup, you can skip the configuration steps below — though it is still recommended to read through them. They cover monitor configuration, must-have apps, and useful utilities you will want to know about regardless of your starting point.
+  </Step>
+
+  <Step title="Get Oriented with the Default Config">
+    Once Hyprland is running, you will be greeted by the default configuration. The essential keybind to know immediately is:
+
+    | Keybind | Action |
+    |---|---|
+    | `SUPER + Q` | Launch kitty (terminal) |
+
+    The default configuration file lives at:
+
+    ```bash
+    ~/.config/hypr/hyprland.lua
+    ```
+
+    An annotated example config is available on GitHub: [example/hyprland.lua](https://github.com/hyprwm/Hyprland/blob/main/example/hyprland.lua). Open it in a text editor from your kitty terminal to start making changes.
+
+    <Tip>
+      If you want to change the default terminal before exploring further, edit `~/.config/hypr/hyprland.lua` and update the terminal keybind to point to your preferred emulator.
+    </Tip>
+  </Step>
+
+  <Step title="Configure Your Monitors">
+    Multi-monitor setups, custom resolutions, refresh rates, and scaling are all configured on the monitors page. Head there to get your displays exactly right before continuing:
+
+    See the [Monitors page](/configuring/monitors) for full details.
+  </Step>
+
+  <Step title="Read the Full Configuration Docs">
+    Hyprland's configuration system is extensive. The [Configuring page](/configuring) covers:
+
+    - Keybinds and window rules
+    - Animations and decoration
+    - Workspace layout options
+    - Environment variables
+    - The full Lua configuration API
+
+    Take the time to read through the sections relevant to your workflow.
+  </Step>
+
+  <Step title="Install Must-Have Software">
+    Hyprland ships without any desktop services. Before things like screen sharing, clipboard management, and authentication dialogs will work, you need to install the right supporting software.
+
+    See the [Useful Utilities page](/useful-utilities) for the essential list. This includes things like:
+
+    - An XDG desktop portal (`xdg-desktop-portal-hyprland`)
+    - A notification daemon
+    - An authentication agent (polkit)
+    - A clipboard manager
+  </Step>
+
+  <Step title="Replace X11 Apps with Wayland Equivalents">
+    Many popular X11-era tools have Wayland-native replacements that work better under Hyprland. See the [Useful Utilities page](/useful-utilities) for a curated list.
+
+    The [Awesome-Hyprland](https://github.com/hyprland-community/awesome-hyprland) repository maintains a more comprehensive community-curated catalogue.
+  </Step>
+
+  <Step title="Force Chromium and Electron Apps to Use Wayland">
+    Many apps default to XWayland even when a Wayland backend is available. Chromium-based browsers and Electron apps are the most common offenders.
+
+    **Chromium-based browsers** (Chrome, Chromium, Brave, Edge, etc.):
+
+    Pass these flags at launch, or search for "ozone" in `chrome://flags` and select **Wayland**:
+
+    ```bash
+    --enable-features=UseOzonePlatform --ozone-platform=wayland
+    ```
+
+    **Electron apps** (most of them):
+
+    Create or edit `~/.config/electron-flags.conf` and add:
+
+    ```bash
+    --enable-features=UseOzonePlatform
+    --ozone-platform=wayland
+    ```
+
+    <Note>
+      VSCode is known **not** to work with `electron-flags.conf`. Configure it separately or leave it running under XWayland.
+    </Note>
+
+    **NixOS users** can set the environment variable `NIXOS_OZONE_WL=1` in their NixOS configuration to apply this globally.
+
+    Additional Wayland environment variables are documented on the [Environment Variables page](/configuring/environment-variables).
+
+    To verify whether an app is running natively or through XWayland:
+
+    ```bash
+    hyprctl clients
+    ```
+  </Step>
+
+  <Step title="Set Up GTK and Qt Themes">
+    Because Hyprland is not a full Desktop Environment, theme settings are not applied automatically. You need separate tools for each toolkit:
+
+    | Toolkit | Recommended Tool |
+    |---|---|
+    | GTK | `nwg-look` (recommended) or `lxappearance` |
+    | Qt 6 | `hyprqt6engine` |
+
+    Install your preferred tools and use them to set your icon theme, cursor theme, font, and color scheme.
+  </Step>
+
+  <Step title="Configure Your Cursor Theme">
+    Cursors under Wayland require a bit of extra configuration compared to X11. See the [FAQ entry on changing your mouse cursor](/faq#how-do-i-change-my-mouse-cursor) for a complete walkthrough.
+  </Step>
+
+</Steps>
+
+## Where to Go Next
+
+You now have a working Hyprland desktop. Here are the most useful places to continue:
+
+<CardGroup cols={2}>
+  <Card title="Configuring Hyprland" icon="sliders" href="/configuring">
+    Deep-dive into the full Lua configuration API: keybinds, window rules, animations, and more.
+  </Card>
+  <Card title="Useful Utilities" icon="toolbox" href="/useful-utilities">
+    Wayland-native replacements for common X11 tools and a guide to the Hyprland ecosystem.
+  </Card>
+  <Card title="FAQ" icon="circle-question" href="/faq">
+    Answers to the most common questions and problems users encounter.
+  </Card>
+  <Card title="Crashes and Bugs" icon="bug" href="/crashes-and-bugs">
+    What to do if Hyprland crashes on launch or behaves unexpectedly.
+  </Card>
+</CardGroup>

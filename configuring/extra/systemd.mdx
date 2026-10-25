@@ -1,0 +1,71 @@
+---
+title: "Hyprland and systemd: Session Targets, UWSM, and Env Vars"
+sidebarTitle: systemd
+description: Understand how Hyprland integrates with systemd's graphical-session.target, clean up legacy configs, and use UWSM for advanced session management.
+---
+
+systemd expects `graphical-session.target` to be activated when a Wayland compositor starts. This target is a dependency for many user services — most notably `xdg-desktop-portal`, which is required for screen sharing, GTK color-scheme switching, and other portal-based features. Without it, those services may fail to start or behave incorrectly.
+
+## hyprland-session.target
+
+Hyprland now handles `graphical-session.target` integration automatically. You do not need any manual configuration to get it working.
+
+If you previously set up a custom `hyprland-session.target` based on an older version of this guide, you can remove it with:
+
+```bash
+systemctl --user revert hyprland-session.target
+```
+
+Additionally, any manual `systemctl` calls in your `hyprland.lua` from older setups should be removed:
+
+```lua
+-- REMOVE these if present — they are handled automatically now
+hl.on("hyprland.start", function()
+    hl.exec_cmd("systemctl --user start hyprland-session.target")
+end)
+
+hl.on("hyprland.shutdown", function()
+    os.execute("systemctl --user stop graphical-session.target")
+end)
+```
+
+<Note>
+  Under systemd, a single user is not expected to run multiple graphical sessions simultaneously. If you do run more than one Hyprland instance, be aware that exiting one will stop `graphical-session.target` and may affect your other running sessions.
+
+  Setting the `HYPRLAND_NO_SD_TARGET` environment variable will prevent Hyprland from starting or stopping `hyprland-session.target` and `graphical-session.target` at all. If you need multi-session behavior, you may want to adopt custom Lua event listeners to manage session targets yourself.
+</Note>
+
+## Environment Variable Propagation
+
+Some programs launched as systemd user services require environment variables that are set when Hyprland starts (such as `WAYLAND_DISPLAY`, `DISPLAY`, or custom variables you define). By default, systemd does not inherit these from the compositor's environment.
+
+To export all environment variables to systemd and D-Bus at startup, add this to your `hyprland.lua`:
+
+```lua
+hl.on("hyprland.start", function()
+    hl.exec_cmd("dbus-update-activation-environment --systemd --all")
+end)
+```
+
+If you manage your configuration with the [Home Manager module](/nix/home-manager), you can achieve this declaratively:
+
+```nix
+# home.nix
+{
+  wayland.windowManager.hyprland.systemd.variables = ["--all"];
+}
+```
+
+## exec-once and systemd
+
+When using `exec-once` (or `hl.on("hyprland.start", ...)`) to launch programs that register as systemd user services, the order of startup matters. Ensure that services depending on `graphical-session.target` wait for it to be active before they start — this is the default behavior for well-behaved user services.
+
+## UWSM
+
+UWSM (Universal Wayland Session Manager) is a tool designed to launch Wayland compositors as fully managed systemd sessions. It starts `graphical-session.target` automatically and handles the full session lifecycle including environment setup and shutdown sequencing.
+
+<Tip>
+  If you want to take full advantage of systemd's session management features — including proper dependency ordering, service supervision, and clean session teardown — UWSM is the recommended approach.
+</Tip>
+
+For the complete UWSM setup guide, including installation, configuration, and integration with display managers, see the [UWSM section](/useful-utilities) on the Useful Utilities page.

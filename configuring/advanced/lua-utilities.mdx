@@ -1,0 +1,147 @@
+---
+title: "Hyprland Lua Utilities: Scripting the Compositor"
+sidebarTitle: Lua Utilities
+description: "Reference for all hl.* Lua utilities in Hyprland — query windows, monitors, workspaces, manage timers, and dynamically change config options at runtime."
+---
+
+Hyprland exposes a comprehensive set of Lua utility functions under the `hl` global namespace. These let you query live compositor state — active windows, monitors, workspaces, cursor position — and modify config options at runtime without a full reload. Combined with the [events system](/configuring/advanced/events) and [keybinds](/configuring/binds), they form the foundation of powerful desktop automation.
+
+<Tip>
+  Set up the Hyprland Lua LSP in your editor to get full autocompletion and inline documentation for every `hl.*` function and the fields of returned objects. Use the [hyprctl REPL](/configuring/advanced/hyprctl) to interactively explore `hl.*` functions and returned object fields.
+</Tip>
+
+## Practical Example
+
+Here is a complete, real-world example that uses several utility functions together to implement smart float-toggle logic:
+
+```lua
+-- Toggle floating on the active window, unless it's htop —
+-- in which case only set floating (never toggle back to tiled).
+hl.bind("SUPER + X", function()
+  local w = hl.get_active_window()
+  if w ~= nil and w.title == "htop" then
+    hl.dispatch(hl.dsp.window.float({ action = "set" }))
+  else
+    hl.dispatch(hl.dsp.window.float({ action = "toggle" }))
+  end
+end)
+```
+
+---
+
+## Convenience Functions
+
+All query functions are available globally as `hl.*`:
+
+<CardGroup cols={2}>
+  <Card title="Window queries" icon="window">
+    - `hl.get_active_window()` — returns the currently focused window, or `nil`.
+    - `hl.get_windows()` — returns a table of all open windows.
+    - `hl.get_window(selector)` — returns a window matching the selector.
+    - `hl.get_urgent_window()` — returns the window with the urgent flag, or `nil`.
+    - `hl.get_last_window()` — returns the previously focused window.
+    - `hl.get_workspace_windows(workspace_selector)` — returns all windows on a workspace.
+  </Card>
+  <Card title="Workspace queries" icon="layout-grid">
+    - `hl.get_workspaces()` — returns a table of all workspaces.
+    - `hl.get_workspace(selector)` — returns the workspace matching the selector.
+    - `hl.get_active_workspace()` — returns the currently active workspace.
+    - `hl.get_active_special_workspace()` — returns the active special workspace, or `nil`.
+    - `hl.get_last_workspace()` — returns the previously active workspace.
+  </Card>
+  <Card title="Monitor queries" icon="monitor">
+    - `hl.get_monitors({ all? })` — returns all monitors. Pass `{ all = true }` to include inactive ones.
+    - `hl.get_monitor(selector)` — returns the monitor matching the selector.
+    - `hl.get_active_monitor()` — returns the currently focused monitor.
+    - `hl.get_monitor_at({ x = int, y = int })` — returns the monitor at the given global coordinates.
+    - `hl.get_monitor_at_cursor()` — returns the monitor under the cursor.
+  </Card>
+  <Card title="Misc utilities" icon="tool">
+    - `hl.get_cursor_pos()` — returns `{ x, y }` global cursor coordinates.
+    - `hl.get_layers()` — returns all layer surfaces.
+    - `hl.get_current_submap()` — returns the name of the active keybind submap.
+    - `hl.get_config(option)` — returns the current value of a config option.
+    - `hl.get_loaded_plugins()` — returns a table of loaded plugins.
+    - `hl.version()` — returns version information.
+    - `hl.is_key_down(key)` — returns `true` if the given key (int XKB code or string name) is currently held.
+  </Card>
+</CardGroup>
+
+---
+
+## Dynamically Changing Config Options
+
+Use `hl.get_config(option)` to read a config value and `hl.config({ ... })` to set one. Option names use dot-separated `section.option` notation.
+
+<Note>
+  `hl.get_config()` returns the **underlying type** of the option, not necessarily the same form you wrote in the config. For example, if `general.gaps_in` is set to `3`, it is returned as a table `{ top = 3, left = 3, right = 3, bottom = 3 }` because the option also accepts per-side values.
+</Note>
+
+```lua
+-- Toggle gaps_in between 0 and 3
+hl.bind("SUPER + SHIFT + G", function()
+  if hl.get_config("general.gaps_in").top == 3 then
+    hl.config({ ["general.gaps_in"] = 0 })
+  else
+    hl.config({ ["general.gaps_in"] = 3 })
+  end
+end)
+```
+
+---
+
+## Prop Refresh
+
+A **prop refresh** is an internal event in which Hyprland updates many configurable options — keyboard layouts, device configs, monitor states, window gaps, and so on. Creating a workspace rule, for example, schedules a prop refresh to run at the end of the current event.
+
+Hyprland always schedules at most **one** prop refresh per event to avoid redundant work. This means changes that trigger a prop refresh (like creating a workspace rule that removes `gaps_in`) are only visible **after** the current Lua function returns, not on subsequent lines within the same function.
+
+To force the pending prop refresh to execute immediately, call:
+
+```lua
+hl.exec_scheduled_prop_refresh_immediately()
+```
+
+Because the scheduled refresh runs early, a new one can be enqueued immediately after.
+
+<Warning>
+  Calling `hl.exec_scheduled_prop_refresh_immediately()` too frequently causes performance degradation. Use the `config.props_refreshed` [event](/configuring/advanced/events) to monitor how many prop refreshes are triggered per event.
+</Warning>
+
+---
+
+## Spawning External Processes
+
+`hl.exec_cmd()` spawns an asynchronous child process. You do **not** need `& disown` — the call returns immediately and the process runs in the background.
+
+```lua
+hl.exec_cmd("notify-send 'Hyprland' 'Config loaded'")
+```
+
+---
+
+## Timers
+
+Spawn and manage recurring or one-shot timers with `hl.timer()`. The first argument is a callback, and the second is an options table with `timeout` (milliseconds) and `type` (`"once"` or `"repeat"`).
+
+```lua
+local demoTimer = hl.timer(function()
+  print("hello from timer")
+end, { timeout = 1000, type = "repeat" })
+
+-- Pause the timer immediately
+demoTimer:set_enabled(false)
+
+-- Toggle the timer with a keybind
+hl.bind("SUPER + X", function()
+  demoTimer:set_enabled(not demoTimer:is_enabled())
+end)
+```
+
+Timers are automatically stopped when the Lua state is torn down (config reload or shutdown). Use the `config.unload` [event](/configuring/advanced/events) if you need to perform cleanup before teardown.
+
+---
+
+## IPC as an Alternative
+
+Lua utilities are the recommended approach for the vast majority of compositor scripting needs — they are faster, less error-prone, and more feature-rich than external IPC calls. If you do need to interact with Hyprland from an external process rather than from within the Lua config, see the [IPC documentation](/ipc).

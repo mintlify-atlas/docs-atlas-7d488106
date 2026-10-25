@@ -1,0 +1,54 @@
+---
+title: "Hyprland Layouts: Choosing and Switching Tiling Modes"
+sidebarTitle: Layouts
+description: "An overview of the layout engines built into Hyprland — Dwindle, Master, Monocle, and Scrolling — and how to select one in your config."
+---
+
+Hyprland ships with four built-in layout engines that control how tiled windows are arranged on a workspace. Layouts are global — every workspace uses the same engine unless overridden by a workspace rule — and you can switch between them at any time by changing a single option in the `general` config category.
+
+## Selecting a Layout
+
+Set `general.layout` in your Hyprland configuration to the name of the desired layout engine. The available built-in values are `dwindle`, `master`, `monocle`, and `scrolling`.
+
+```lua
+general {
+    layout = dwindle   -- default
+}
+```
+
+You can also switch layouts at runtime using `hl.config.set`:
+
+```lua
+hl.config.set("general.layout", "master")
+```
+
+<Note>
+  Changing `general.layout` applies immediately to all workspaces and takes effect without restarting the compositor.
+</Note>
+
+## Built-in Layouts
+
+Hyprland provides four fully supported built-in layout algorithms, each with its own configuration category and set of layout-specific dispatchers.
+
+<CardGroup cols={2}>
+  <Card title="Dwindle" icon="code-branch" href="/configuring/layouts/dwindle">
+    A BSPWM-style binary-tree layout where each new window splits the focused window. Supports pseudotiling, smart splits, and configurable split ratios.
+  </Card>
+  <Card title="Scrolling" icon="scroll" href="/configuring/layouts/scrolling">
+    Windows live on an infinitely scrolling horizontal (or vertical) tape of columns, letting you pan through your workspace like a canvas.
+  </Card>
+  <Card title="Master" icon="layout-template" href="/configuring/layouts/master">
+    One or more "master" windows occupy a primary area while all remaining windows stack in a secondary area. Orientation is fully configurable per workspace.
+  </Card>
+  <Card title="Monocle" icon="square" href="/configuring/layouts/monocle">
+    Every window fills the entire unreserved workspace area, stacked on top of one another. Navigate the stack with dedicated cycle dispatchers.
+  </Card>
+</CardGroup>
+
+## Custom Layouts
+
+Beyond the built-in engines, Hyprland lets you define fully custom layouts directly in your Lua configuration using `hl.layout.register`. This requires no C++ or plugin compilation — just a `recalculate` function and optionally a `layout_msg` handler.
+
+<Card title="Custom Layouts" icon="puzzle-piece" href="/configuring/layouts/custom">
+  Write your own layout algorithm in Lua using the `hl.layout.register` API, with access to convenience helpers like `ctx:column()`, `ctx:grid_cell()`, and `ctx:split()`.
+</Card>

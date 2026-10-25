@@ -1,0 +1,382 @@
+---
+title: "Window, Layer, and Workspace Rules in Hyprland"
+sidebarTitle: "Rules"
+description: "Reference for Hyprland rules: window rules with static and dynamic effects, layer rules for bars and launchers, and per-workspace layout rules."
+---
+
+Rules allow you to enforce specific behaviour for matched windows, layers, and workspaces. Each rule is composed of **props** (inside the `match` table) that determine what to target, and **effects** (outside `match`) that define what to apply. All props must match for the rule to fire.
+
+Rules are evaluated top to bottom. Named rules are evaluated first, then anonymous ones. The last matching rule for a given effect takes precedence.
+
+<Note>
+In `hyprctl clients` output, `fullscreen` refers to `fullscreen_state_internal` and `fullscreenClient` refers to `fullscreen_state_client`.
+</Note>
+
+---
+
+## Window Rules
+
+Window rules are declared with `hl.window_rule()`.
+
+```lua
+hl.window_rule({
+    name?  = string,        -- optional: name for later enable/disable
+    match  = {
+        prop = value,       -- one or more match props
+    },
+    effect = value,         -- one or more effects
+})
+```
+
+### Match Props
+
+| Prop | Description | Type |
+| --- | --- | --- |
+| `class` | Windows with `class` matching RegEx | RegEx |
+| `content` | Windows with content type: `"none"`, `"photo"`, `"video"`, `"game"` | string |
+| `focus` | Currently focused window | bool |
+| `fullscreen` | Fullscreen (covering or non-covering) windows | bool |
+| `fullscreen_state_client` | Client fullscreen state: `0`=none, `1`=maximize, `2`=fullscreen, `3`=both | int |
+| `fullscreen_state_internal` | Internal fullscreen state: same values | int |
+| `float` | Floating windows | bool |
+| `group` | Grouped windows | bool |
+| `initial_class` | Windows with `initialClass` matching RegEx | RegEx |
+| `initial_title` | Windows with `initialTitle` matching RegEx | RegEx |
+| `modal` | Modal windows (e.g. "Are you sure?" dialogs) | bool |
+| `pin` | Pinned windows | bool |
+| `tag` | Windows with a matching tag | string |
+| `title` | Windows with `title` matching RegEx | RegEx |
+| `workspace` | Windows on a matching workspace | workspace selector |
+| `xdg_tag` | Windows with a matching XDG tag | RegEx |
+| `xwayland` | Xwayland windows | bool |
+
+### Static Effects
+
+Static effects are evaluated **once** when the window opens and never re-evaluated. They always match against `initialTitle` and `initialClass` rather than current values.
+
+<Warning>
+You cannot use static effects (like `float`) based on a title that changes after window creation. Use a dynamic dispatcher triggered by the `window.title` event instead:
+
+```lua
+hl.on("window.title", function(w)
+    if w ~= nil and w.title == "foo" then
+        hl.dispatch(hl.dsp.window.float({ action = "set" }))
+    end
+end)
+```
+</Warning>
+
+| Effect | Description | Type |
+| --- | --- | --- |
+| `center` | Center the floating window on its monitor | bool |
+| `content` | Set content type: `"none"`, `"photo"`, `"video"`, `"game"` | string |
+| `float` | Float the window | bool |
+| `fullscreen` | Open window fullscreen | bool |
+| `fullscreen_state` | Set internal/client fullscreen mode, e.g. `"1 2"` | string |
+| `group` | Set group behaviour. See [Group Options](#group-window-rule-options) | string |
+| `maximize` | Maximize the window | bool |
+| `monitor` | Monitor on which to open the window, e.g. `"DP-1"`. Append `" silent"` to not focus | string |
+| `move` | Move floating window to coordinates. See [Position and Size](#position-and-size) | table or string |
+| `no_close_for` | Make window uncloseable for N ms on open | int |
+| `no_initial_focus` | Disable initial focus | bool |
+| `pin` | Pin the window to show on all workspaces (requires `float = true`) | bool |
+| `pseudo` | Pseudotile the window | bool |
+| `scrolling_width` | Column width when opening on a scrolling layout workspace | float |
+| `size` | Set size of floating window. See [Position and Size](#position-and-size) | table or string |
+| `suppress_event` | Ignore events (space-separated): `"fullscreen"`, `"maximize"`, `"activate"`, `"activatefocus"`, `"fullscreenoutput"`, `"x11configurerequest"` | string |
+| `tile` | Tile the window | bool |
+| `workspace` | Open on a specific workspace. Can include `" silent"` or be `"unset"` | string |
+
+### Dynamic Effects
+
+Dynamic effects are re-evaluated whenever the matched property changes. They can also be set at runtime with `hl.dsp.window.set_prop()`.
+
+| Effect | Description | Type |
+| --- | --- | --- |
+| `allows_input` | Force Xwayland window to accept input even if it opts out | bool |
+| `animation` | Force an animation style, e.g. `"popin"` or `"popin 80%"` | string |
+| `border_color` | Set border to a color or gradient. See [border_color](#border_color-rule) | gradient |
+| `border_size` | Override border size | int |
+| `confine_pointer` | Lock mouse cursor to this window | bool |
+| `decorate` | Whether to draw window decorations | bool |
+| `dim_around` | Dim everything around this floating window | bool |
+| `focus_on_activate` | Whether to focus when the app requests activation | bool |
+| `idle_inhibit` | Idle inhibit mode: `"none"`, `"always"`, `"focus"`, `"fullscreen"` | string |
+| `immediate` | Force tearing for this window | bool |
+| `keep_aspect_ratio` | Force aspect ratio when mouse-resizing | bool |
+| `max_size` | Maximum size for floating windows | table or string |
+| `min_size` | Minimum size for floating windows | table or string |
+| `nearest_neighbor` | Force nearest-neighbor filtering | bool |
+| `no_anim` | Disable animations | bool |
+| `no_auto_hdr` | Disable AutoHDR (useful for foot in fullscreen) | bool |
+| `no_blur` | Disable blur | bool |
+| `no_dim` | Disable dimming | bool |
+| `no_focus` | Prevent focusing | bool |
+| `no_follow_mouse` | Prevent focus-follows-mouse for this window | bool |
+| `no_glow` | Disable glow | bool |
+| `no_max_size` | Remove max size limitations | bool |
+| `no_screen_share` | Hide from screen sharing (draw black in its place) | bool |
+| `no_shadow` | Disable shadows | bool |
+| `no_shortcuts_inhibit` | Prevent the app from inhibiting shortcuts | bool |
+| `no_vrr` | Disable VRR for this window (requires `misc.vrr = 2` or `3`) | bool |
+| `no_wobble` | Disable wobble effect | bool |
+| `opacity` | Opacity string: `"0.8"`, `"0.9 0.7"`, `"1.0 0.8 0.9"`. Append `" override"` for absolute values | string |
+| `opaque` | Set all opacity values to 1 for this window | bool |
+| `force_rgbx` | Disable the window's own transparency | bool |
+| `persistent_size` | Restore size for same class/title floating windows | bool |
+| `render_unfocused` | Force window to render even when not visible | bool |
+| `rounding` | Force X pixels of corner rounding | int |
+| `rounding_power` | Override rounding curve | float |
+| `stay_focused` | Keep focus on the window as long as it's visible | bool |
+| `tag` | Apply/remove a dynamic tag: `"+myTag"`, `"-myTag"`, `"myTag"` (toggle) | string |
+| `tonemap` | Tonemapping: `"on"`, `"off"`, `"clamp"`, `"limited"` | string |
+| `xray` | Set blur xray mode | bool |
+
+### Position and Size
+
+The `move` and `size` effects accept a Lua table `{ x, y }` or a space-separated string `"x y"`. Values can be numbers or expressions:
+
+| Expression | Meaning |
+| --- | --- |
+| `monitor_w`, `monitor_h` | Monitor dimensions |
+| `window_x`, `window_y` | Window position |
+| `window_w`, `window_h` | Window dimensions |
+| `cursor_x`, `cursor_y` | Cursor position |
+
+```lua
+-- Set window to 800×600
+size = { 800, 600 }
+
+-- Center the window on the cursor
+move = { "cursor_x - (window_w * 0.5)", "cursor_y - (window_h * 0.5)" }
+
+-- Half the monitor size
+size = { "monitor_w * 0.5", "monitor_h * 0.5" }
+```
+
+### `border_color` Rule
+
+```lua
+-- Single color
+border_color = "rgb(FF0000)"
+
+-- Gradient
+border_color = { colors = { "rgba(33ccffee)", "rgba(00ff99ee)" }, angle = 45 }
+
+-- Set inactive border of Firefox to a gradient
+hl.window_rule({
+    match        = { class = "firefox", focus = false },
+    border_color = { colors = { "rgba(ffff00ee)", "rgba(00ffffee)" }, angle = 33 },
+})
+```
+
+### Group Window Rule Options
+
+The `group` effect takes a space-separated options string:
+
+| Option | Description |
+| --- | --- |
+| `"barred"` | Do not auto-group into the focused unlocked group |
+| `"deny"` | Never allow this window to be toggled as or added to a group |
+| `"invade"` | Force open in the locked group |
+| `"lock"` [`"always"`] | Lock the group. Combine with `"set"` or `"new"` |
+| `"new"` | Shorthand for `"barred set"` |
+| `"override"` | Override other group rules |
+| `"set"` [`"always"`] | Open as a group |
+| `"unset"` | Clear all group rules |
+
+### Tags
+
+Tags allow grouping and targeting windows by a user-defined label.
+
+<Tabs>
+<Tab title="Static Tags (dispatcher)">
+```bash
+hyprctl dispatch 'hl.dsp.window.tag({ tag = "+code" })'  -- Add
+hyprctl dispatch 'hl.dsp.window.tag({ tag = "-code" })'  -- Remove
+hyprctl dispatch 'hl.dsp.window.tag({ tag = "code" })'   -- Toggle
+```
+</Tab>
+<Tab title="Dynamic Tags (window rule)">
+```lua
+hl.window_rule({ match = { class = "footclient" }, tag = "+term" })   -- Add dynamic tag `term*`
+hl.window_rule({ match = { class = "footclient" }, tag = "term" })    -- Toggle `term*`
+hl.window_rule({ match = { tag = "code" },         opacity = "0.8" }) -- Target `code` or `code*`
+hl.window_rule({ match = { tag = "term*" },        opacity = "0.6" }) -- Match `term*` only
+```
+</Tab>
+</Tabs>
+
+Dynamic tags have a `*` suffix and are cleared when the static tag dispatcher is called. Check tags with `hyprctl clients`.
+
+### Named Rules and Runtime Control
+
+Only named rules can be enabled, disabled, or queried at runtime:
+
+```lua
+local myRule = hl.window_rule({
+    name        = "my-rule",
+    match       = { class = "kitty" },
+    border_size = 5,
+})
+
+myRule:set_enabled(false)  -- disable
+myRule:set_enabled(true)   -- re-enable
+myRule:is_enabled()        -- query
+```
+
+### Window Rule Examples
+
+```lua
+-- Float and center kitty
+hl.window_rule({ match = { class = "kitty" }, float = true, center = true })
+
+-- Disable blur for Firefox
+hl.window_rule({ match = { class = "firefox" }, no_blur = true })
+
+-- Set opacity: 1.0 active, 0.5 inactive, 0.8 fullscreen for kitty
+hl.window_rule({
+    match   = { class = "kitty" },
+    opacity = "1.0 override 0.5 override 0.8 override",
+})
+
+-- Smart gaps: no border/rounding when only one tiled window
+hl.workspace_rule({ workspace = "w[tv1]", gaps_in = 0, gaps_out = 0 })
+hl.window_rule({ match = { float = false, workspace = "w[tv1]" }, border_size = 0 })
+hl.window_rule({ match = { float = false, workspace = "w[tv1]" }, rounding = 0 })
+
+-- Privacy browsers should stay floating at their default size
+hl.window_rule({
+    name             = "privacy-browsers-float",
+    match            = { class = "^(Tor Browser|Mullvad Browser)$" },
+    float            = true,
+    center           = true,
+    fullscreen_state = "0 0",
+    suppress_event   = "maximize",
+})
+```
+
+---
+
+## Layer Rules
+
+Layers are Wayland surfaces that are not windows — app launchers, status bars, wallpapers, and overlays. They use `hl.layer_rule()` with the same syntax as window rules.
+
+```lua
+hl.layer_rule({
+    name?  = string,
+    match  = { prop = value },
+    effect = value,
+})
+```
+
+### Layer Match Props
+
+| Prop | Description | Type |
+| --- | --- | --- |
+| `namespace` | Namespace of the layer (check `hyprctl layers`) | RegEx |
+
+### Layer Effects
+
+| Effect | Description | Type |
+| --- | --- | --- |
+| `above_lock` | Render above the lock screen. `2` = interactive on lock screen | int |
+| `animation` | Specific animation style for this layer | string |
+| `blur` | Enable blur for the layer | bool |
+| `blur_popups` | Enable blur for layer popups | bool |
+| `dim_around` | Dim everything behind the layer | bool |
+| `ignore_alpha` | Skip blur on pixels with opacity ≤ this value | float |
+| `no_anim` | Disable animations | bool |
+| `no_screen_share` | Hide layer from screen sharing | bool |
+| `order` | Space-reservation priority relative to other layers | int |
+| `xray` | Set blur xray mode | bool |
+
+### Layer Rule Examples
+
+```lua
+-- Enable blur for Waybar
+hl.layer_rule({ match = { namespace = "waybar" }, blur = true })
+
+-- Disable animation for the selection overlay
+hl.layer_rule({
+    name    = "no-anim-for-selection",
+    match   = { namespace = "selection" },
+    no_anim = true,
+})
+
+-- Blur and ignore semi-transparent pixels for Rofi
+hl.layer_rule({
+    match        = { namespace = "rofi" },
+    blur         = true,
+    ignore_alpha = 0.5,
+})
+```
+
+Layer rules also return a handle with `set_enabled()` / `is_enabled()`.
+
+---
+
+## Workspace Rules
+
+Workspace rules enforce layout or decoration behaviour on specific workspaces.
+
+```lua
+hl.workspace_rule({
+    workspace = workspace_selector,
+    rule1     = value,
+    rule2     = value,
+})
+```
+
+### Workspace Rule Options
+
+| Rule | Description | Type |
+| --- | --- | --- |
+| `animation` | Animation style for this workspace | string |
+| `border_size` | Border size around windows | int |
+| `decorate` | Whether to draw window decorations | bool |
+| `default_name` | Default display name for the workspace | string |
+| `float_gaps` | Gaps for floating windows | css_gaps |
+| `gaps_in` | Gaps between windows | css_gaps |
+| `gaps_out` | Gaps between windows and monitor edges | css_gaps |
+| `layout` | Layout to use for this workspace | string |
+| `layout_opts` | Layout-specific option table | table |
+| `monitor` | Bind the workspace to a monitor | string |
+| `default` | Whether this is the default workspace for its monitor | bool |
+| `no_border` | Disable borders | bool |
+| `no_rounding` | Disable window rounding | bool |
+| `no_shadow` | Disable shadows | bool |
+| `persistent` | Keep workspace alive even when empty and inactive | bool |
+
+### Workspace Rule Examples
+
+```lua
+-- Workspace 3: no rounding, no decorations
+hl.workspace_rule({ workspace = "3", no_rounding = true, decorate = false })
+
+-- Coding workspace: bind to DP-1, no gaps, no borders
+hl.workspace_rule({
+    workspace   = "name:coding",
+    monitor     = "DP-1",
+    default     = true,
+    no_rounding = true,
+    decorate    = false,
+    gaps_in     = 0,
+    gaps_out    = 0,
+    no_border   = true,
+})
+
+-- Per-workspace layouts
+hl.workspace_rule({ workspace = "2", layout = "scrolling" })
+hl.workspace_rule({ workspace = "3", layout = "dwindle" })
+
+-- Workspace 15: custom animation and name
+hl.workspace_rule({ workspace = "15", animation = "slidevert", default_name = "slider" })
+
+-- Bind workspace by monitor description
+hl.workspace_rule({
+    workspace = "name:gaming",
+    monitor   = "desc:Chimei Innolux Corporation 0x150C",
+    default   = true,
+})
+```
